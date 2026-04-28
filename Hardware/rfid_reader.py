@@ -23,11 +23,11 @@ class RFIDReaderService:
         self.on_status_callback = on_status_callback
 
         self.running = False
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
         self.reader = None
 
-        self.last_uid = None
-        self.last_tap_time = 0
+        self.last_uid: Optional[str] = None
+        self.last_tap_time = 0.0
         self.cooldown_seconds = TAP_COOLDOWN_SECONDS
 
     def start(self):
@@ -36,15 +36,25 @@ class RFIDReaderService:
             return
 
         self.running = True
-        self.thread = threading.Thread(target=self.reader_loop, daemon=True)
+
+        self.thread = threading.Thread(
+            target=self.reader_loop,
+            daemon=True,
+        )
         self.thread.start()
 
     def stop(self):
+        if not self.running:
+            self.send_status("RFID reader is already stopped.")
+            return
+
         self.running = False
-        self.send_status("RFID reader stopped.")
+        self.send_status("Stopping RFID reader...")
 
         if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=1)
+            self.thread.join(timeout=2)
+
+        self.send_status("RFID reader stopped.")
 
     def send_status(self, message: str):
         if self.on_status_callback:
@@ -72,16 +82,29 @@ class RFIDReaderService:
         return detected_readers[0]
 
     def read_uid(self) -> str:
-        connection = self.reader.createConnection()
-        connection.connect()
+        if self.reader is None:
+            raise RuntimeError("RFID reader is not initialized.")
 
-        get_uid_apdu = [0xFF, 0xCA, 0x00, 0x00, 0x00]
-        data, sw1, sw2 = connection.transmit(get_uid_apdu)
+        connection = None
 
-        if sw1 == 0x90 and sw2 == 0x00:
-            return self.to_hex_string(data)
+        try:
+            connection = self.reader.createConnection()
+            connection.connect()
 
-        raise RuntimeError(f"Failed to read UID. Status: {sw1:02X} {sw2:02X}")
+            get_uid_apdu = [0xFF, 0xCA, 0x00, 0x00, 0x00]
+            data, sw1, sw2 = connection.transmit(get_uid_apdu)
+
+            if sw1 == 0x90 and sw2 == 0x00:
+                return self.to_hex_string(data)
+
+            raise RuntimeError(f"Failed to read UID. Status: {sw1:02X} {sw2:02X}")
+
+        finally:
+            if connection:
+                try:
+                    connection.disconnect()
+                except Exception:
+                    pass
 
     def reader_loop(self):
         try:
@@ -99,10 +122,7 @@ class RFIDReaderService:
                 uid = self.read_uid()
                 current_time = time.time()
 
-                if (
-                    uid == self.last_uid
-                    and current_time - self.last_tap_time < self.cooldown_seconds
-                ):
+                if self.is_duplicate_tap(uid, current_time):
                     time.sleep(0.3)
                     continue
 
@@ -121,8 +141,29 @@ class RFIDReaderService:
                 time.sleep(0.2)
 
             except Exception as error:
-                self.send_status(f"RFID read error: {error}")
+                error_message = str(error)
+
+                no_card_messages = [
+                    "No card",
+                    "Card is unresponsive",
+                    "Card connection failed",
+                    "Unable to connect",
+                    "The smart card has been removed",
+                    "SCARD_W_REMOVED_CARD",
+                ]
+
+                if any(message in error_message for message in no_card_messages):
+                    time.sleep(0.2)
+                    continue
+
+                self.send_status(f"RFID read error: {error_message}")
                 time.sleep(1)
+
+    def is_duplicate_tap(self, uid: str, current_time: float) -> bool:
+        return (
+            uid == self.last_uid
+            and current_time - self.last_tap_time < self.cooldown_seconds
+        )
 
     @staticmethod
     def to_hex_string(data) -> str:
