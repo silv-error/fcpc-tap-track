@@ -1,0 +1,3 @@
+.venv
+rfid_attendance.db
+__pycache__
