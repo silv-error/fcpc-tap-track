@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Employee | FCPC Attendance Tracker</title>
+  <title>Attendance | FCPC Attendance Tracker</title>
   <script>
     if (localStorage.getItem('sidebar-collapsed') === '1') {
       document.documentElement.classList.add('sidebar-collapsed');
@@ -18,7 +18,9 @@
 
 <div class="dashboard-layout">
 
+  <!-- SIDEBAR -->
   <aside class="sidebar">
+    <!-- User Info -->
     <div class="sidebar-user">
       <div class="sidebar-avatar">
         <img src="images/default-logo.png" alt="Default Logo" />
@@ -29,6 +31,7 @@
       </div>
     </div>
 
+    <!-- Navigation -->
     <nav class="sidebar-nav">
       <a href="users.html">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -42,13 +45,13 @@
         </svg>
         Students
       </a>
-      <a href="employee.html" class="active">
+      <a href="employee.html">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4zm8-4h2v2h-2v2h-2v-2h-2v-2h2V8h2v2z"/>
         </svg>
         Employee
       </a>
-      <a href="attendance.html">
+      <a href="attendance.html" class="active">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
         </svg>
@@ -56,6 +59,7 @@
       </a>
     </nav>
 
+    <!-- Logout -->
     <div class="sidebar-logout">
       <button class="btn-logout" onclick="handleLogout()">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -68,7 +72,10 @@
     </div>
   </aside>
 
+  <!-- MAIN -->
   <div class="main-content">
+
+    <!-- Top Header -->
     <header class="top-header">
       <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -78,15 +85,18 @@
         </svg>
       </button>
 
+      <!-- FCPC Logo top-right -->
       <div class="header-logo">
         <img src="images/fcpc-logo.png" alt="FCPC Logo" height="36" />
       </div>
     </header>
 
+    <!-- Page Content -->
     <main class="page-content">
-      <h1 class="page-title">Employees</h1>
+      <h1 class="page-title">Attendance</h1>
       <hr class="page-divider" />
 
+      <!-- Filters -->
       <div class="filters-row">
         <div class="filter-group">
           <label for="searchInput">Search</label>
@@ -94,108 +104,45 @@
             type="text"
             id="searchInput"
             class="filter-input"
-            placeholder="Search by Employee No./RFID UID/Name"
+            placeholder="Search by Name/ID"
           />
         </div>
 
         <div class="filter-group">
-          <label for="departmentSelect">Department</label>
-          <select id="departmentSelect" class="filter-select">
-            <option value="all">All Departments</option>
+          <label for="typeSelect">Status</label>
+          <select id="typeSelect" class="filter-select">
+            <option value="all">All</option>
+            <option value="Timed In">Timed In</option>
+            <option value="Timed Out">Timed Out</option>
           </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="dateInput">Date</label>
+          <input
+            type="date"
+            id="dateInput"
+            class="filter-input"
+            placeholder="MM/DD/YYYY"
+          />
         </div>
       </div>
 
+      <!-- Table -->
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table" data-endpoint="../backend/api/attendance.php" data-table-type="attendance">
           <thead>
             <tr>
-              <th>Employee No.</th>
-              <th>RFID UID</th>
+              <th>Log Date</th>
+              <th>ID</th>
               <th>Name</th>
-              <th>Position</th>
-              <th>Department</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+              <th>Created At</th>
+              <th>Updated At</th>
             </tr>
           </thead>
-          <tbody>
-            <tr data-department="Office of the President">
-              <td>EMP-001</td>
-              <td>04E5F6A7B8C9</td>
-              <td>Garcia, Elena M.</td>
-              <td>Administrative Officer</td>
-              <td>Office of the President</td>
-            </tr>
-            <tr data-department="College of Computer Studies">
-              <td>EMP-002</td>
-              <td>04F6A7B8C9D0</td>
-              <td>Torres, Daniel R.</td>
-              <td>IT Support Specialist</td>
-              <td>College of Computer Studies</td>
-            </tr>
-            <tr data-department="College of Business Administration">
-              <td>EMP-003</td>
-              <td>04A7B8C9D0E1</td>
-              <td>Lopez, Andrea S.</td>
-              <td>Registrar Staff</td>
-              <td>College of Business Administration</td>
-            </tr>
-            <tr data-department="College of Education">
-              <td>EMP-004</td>
-              <td>04B8C9D0E1F2</td>
-              <td>Flores, Kevin T.</td>
-              <td>Laboratory Technician</td>
-              <td>College of Education</td>
-            </tr>
-            <tr data-department="Office of the President">
-              <td>EMP-005</td>
-              <td>04C9D0E1F2A3</td>
-              <td>Castillo, Maria H.</td>
-              <td>Finance Officer</td>
-              <td>Office of the President</td>
-            </tr>
-            <tr data-department="College of Computer Studies">
-              <td>EMP-006</td>
-              <td>04D0E1F2A3B4</td>
-              <td>Reyes, James S.</td>
-              <td>Systems Administrator</td>
-              <td>College of Computer Studies</td>
-            </tr>
-            <tr data-department="College of Business Administration">
-              <td>EMP-007</td>
-              <td>04E1F2A3B4C5</td>
-              <td>Mercado, Patricia V.</td>
-              <td>Accounting Staff</td>
-              <td>College of Business Administration</td>
-            </tr>
-            <tr data-department="College of Engineering">
-              <td>EMP-008</td>
-              <td>04F2A3B4C5D6</td>
-              <td>Diaz, Roberto W.</td>
-              <td>Maintenance Supervisor</td>
-              <td>College of Engineering</td>
-            </tr>
-            <tr data-department="Office of the President">
-              <td>EMP-009</td>
-              <td>04A3B4C5D6E7</td>
-              <td>Santos, Angela Y.</td>
-              <td>Human Resources Coordinator</td>
-              <td>Office of the President</td>
-            </tr>
-            <tr data-department="College of Computer Studies">
-              <td>EMP-010</td>
-              <td>04B4C5D6E7F8</td>
-              <td>Lopez, Christopher Z.</td>
-              <td>Network Technician</td>
-              <td>College of Computer Studies</td>
-            </tr>
-            <tr data-department="College of Education">
-              <td>EMP-011</td>
-              <td>04C5D6E7F8A9</td>
-              <td>Gutierrez, Lucia B.</td>
-              <td>Curriculum Coordinator</td>
-              <td>College of Education</td>
-            </tr>
-          </tbody>
+          <tbody></tbody>
         </table>
       </div>
 
@@ -210,9 +157,11 @@
         </button>
       </div>
     </main>
-  </div>
-</div>
 
+  </div><!-- end main-content -->
+</div><!-- end dashboard-layout -->
+
+<!-- Logout Modal -->
 <div id="logoutModal" class="modal">
   <div class="modal-overlay"></div>
   <div class="modal-content">

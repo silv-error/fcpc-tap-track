@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Students | FCPC Attendance Tracker</title>
+  <title>Users | FCPC Attendance Tracker</title>
   <script>
     if (localStorage.getItem('sidebar-collapsed') === '1') {
       document.documentElement.classList.add('sidebar-collapsed');
@@ -20,6 +20,7 @@
 
   <!-- SIDEBAR -->
   <aside class="sidebar">
+    <!-- User Info -->
     <div class="sidebar-user">
       <div class="sidebar-avatar">
         <img src="images/default-logo.png" alt="Default Logo" />
@@ -30,14 +31,16 @@
       </div>
     </div>
 
+    <!-- Navigation -->
     <nav class="sidebar-nav">
-      <a href="users.html">
+      <a href="users.html" class="active">
+        <!-- Users icon -->
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
         </svg>
         Users
       </a>
-      <a href="students.html" class="active">
+      <a href="students.html">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L21 9l-9-6zm0 4.2L17.53 10 12 12.8 6.47 10 12 7.2zM7 12.7l5 2.73 5-2.73v3.16L12 18.6l-5-2.74v-3.16z"/>
         </svg>
@@ -50,6 +53,7 @@
         Employee
       </a>
       <a href="attendance.html">
+        <!-- Attendance / list icon -->
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
         </svg>
@@ -57,6 +61,7 @@
       </a>
     </nav>
 
+    <!-- Logout -->
     <div class="sidebar-logout">
       <button class="btn-logout" onclick="handleLogout()">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -69,7 +74,10 @@
     </div>
   </aside>
 
+  <!-- MAIN -->
   <div class="main-content">
+
+    <!-- Top Header -->
     <header class="top-header">
       <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -79,15 +87,18 @@
         </svg>
       </button>
 
+      <!-- FCPC Logo top-right -->
       <div class="header-logo">
         <img src="images/fcpc-logo.png" alt="FCPC Logo" height="36" />
       </div>
     </header>
 
+    <!-- Page Content -->
     <main class="page-content">
-      <h1 class="page-title">Students</h1>
+      <h1 class="page-title">Users</h1>
       <hr class="page-divider" />
 
+      <!-- Filters -->
       <div class="filters-row">
         <div class="filter-group">
           <label for="searchInput">Search</label>
@@ -95,120 +106,45 @@
             type="text"
             id="searchInput"
             class="filter-input"
-            placeholder="Search by Student No./RFID UID/Name"
+            placeholder="Search by Name/ID"
           />
         </div>
 
         <div class="filter-group">
-          <label for="departmentSelect">Department</label>
-          <select id="departmentSelect" class="filter-select">
-            <option value="all">All Departments</option>
+          <label for="typeSelect">Role</label>
+          <select id="typeSelect" class="filter-select">
+            <option value="all">All</option>
+            <option value="Admin">Admin</option>
+            <option value="Superadmin">Superadmin</option>
           </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="dateInput">Date</label>
+          <input
+            type="date"
+            id="dateInput"
+            class="filter-input"
+            placeholder="MM/DD/YYYY"
+          />
         </div>
       </div>
 
+      <!-- Table -->
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table" data-endpoint="../backend/api/users.php" data-table-type="users">
           <thead>
             <tr>
-              <th>Student No.</th>
-              <th>RFID UID</th>
+              <th>ID</th>
               <th>Name</th>
-              <th>Course</th>
-              <th>Year Level</th>
-              <th>Department</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Created At</th>
+              <th>Updated At</th>
             </tr>
           </thead>
-          <tbody>
-            <tr data-department="College of Computer Studies">
-              <td>202200101</td>
-              <td>04A1B2C3D4E5</td>
-              <td>Alvarez, Mia C.</td>
-              <td>BSIT</td>
-              <td>3rd Year</td>
-              <td>College of Computer Studies</td>
-            </tr>
-            <tr data-department="College of Business Administration">
-              <td>202200245</td>
-              <td>04B2C3D4E5F6</td>
-              <td>Reyes, Aaron P.</td>
-              <td>BSBA</td>
-              <td>2nd Year</td>
-              <td>College of Business Administration</td>
-            </tr>
-            <tr data-department="College of Education">
-              <td>202200389</td>
-              <td>04C3D4E5F6A7</td>
-              <td>Diaz, Nicole L.</td>
-              <td>BSED</td>
-              <td>4th Year</td>
-              <td>College of Education</td>
-            </tr>
-            <tr data-department="College of Engineering">
-              <td>202200417</td>
-              <td>04D4E5F6A7B8</td>
-              <td>Santos, Mark J.</td>
-              <td>BSCE</td>
-              <td>1st Year</td>
-              <td>College of Engineering</td>
-            </tr>
-            <tr data-department="College of Computer Studies">
-              <td>202200528</td>
-              <td>04E5F6A7B8C9</td>
-              <td>Cruz, Isabella R.</td>
-              <td>BSIT</td>
-              <td>2nd Year</td>
-              <td>College of Computer Studies</td>
-            </tr>
-            <tr data-department="College of Business Administration">
-              <td>202200639</td>
-              <td>04F6A7B8C9D0</td>
-              <td>Tan, Vincent M.</td>
-              <td>BSBA</td>
-              <td>3rd Year</td>
-              <td>College of Business Administration</td>
-            </tr>
-            <tr data-department="College of Education">
-              <td>202200740</td>
-              <td>04A7B8C9D0E1</td>
-              <td>Mercado, Sofia N.</td>
-              <td>BSED</td>
-              <td>1st Year</td>
-              <td>College of Education</td>
-            </tr>
-            <tr data-department="College of Engineering">
-              <td>202200851</td>
-              <td>04B8C9D0E1F2</td>
-              <td>Bonifacio, Diego L.</td>
-              <td>BSCE</td>
-              <td>4th Year</td>
-              <td>College of Engineering</td>
-            </tr>
-            <tr data-department="College of Computer Studies">
-              <td>202200962</td>
-              <td>04C9D0E1F2A3</td>
-              <td>Gutierrez, Jessica O.</td>
-              <td>BSIT</td>
-              <td>3rd Year</td>
-              <td>College of Computer Studies</td>
-            </tr>
-            <tr data-department="College of Business Administration">
-              <td>202201073</td>
-              <td>04D0E1F2A3B4</td>
-              <td>Santos, Carlos P.</td>
-              <td>BSBA</td>
-              <td>1st Year</td>
-              <td>College of Business Administration</td>
-            </tr>
-            <tr data-department="College of Education">
-              <td>202201184</td>
-              <td>04E1F2A3B4C5</td>
-              <td>Fernandez, Rachel K.</td>
-              <td>BSED</td>
-              <td>2nd Year</td>
-              <td>College of Education</td>
-            </tr>
-          </tbody>
+          <tbody></tbody>
         </table>
       </div>
 
@@ -223,9 +159,11 @@
         </button>
       </div>
     </main>
-  </div>
-</div>
 
+  </div><!-- end main-content -->
+</div><!-- end dashboard-layout -->
+
+<!-- Logout Modal -->
 <div id="logoutModal" class="modal">
   <div class="modal-overlay"></div>
   <div class="modal-content">
