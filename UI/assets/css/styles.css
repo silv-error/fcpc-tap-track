@@ -1,9 +1,91 @@
+/* ===== CSS VARIABLES ===== */
+:root {
+  --navy: #1a237e;
+  --navy-light: #3f3f9f;
+  --gray-light: #ccc;
+  --white: #ffffff;
+  --text-body: #444;
+  --transition: 0.2s;
+}
+
+/* ===== PAGINATION ===== */
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 16px 4px;
+  flex-wrap: nowrap;
+}
+
+#pageNumbers {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.pg-btn {
+  min-width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--gray-light);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+  padding: 0 4px;
+}
+
+.pg-btn:hover:not(:disabled) {
+  border-color: var(--navy-light);
+  color: var(--navy);
+  background: #f0f3ff;
+}
+
+.pagination-ellipsis {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text-body);
+  cursor: default;
+}
+
+.pg-btn.active {
+  background: var(--navy);
+  color: var(--white);
+  border-color: var(--navy);
+}
+
+.pg-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pg-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* ===== SIDEBAR COLLAPSED STATE ===== */
 .sidebar {
   transition: width 0.4s ease-in-out;
 }
 
 .sidebar.collapsed {
+  width: 64px;
+  min-width: 64px;
+}
+
+html.sidebar-collapsed .sidebar {
   width: 64px;
   min-width: 64px;
 }
@@ -28,6 +110,68 @@
   visibility: hidden;
 }
 
+html.sidebar-collapsed .sidebar-user-info,
+html.sidebar-collapsed .sidebar-user h3,
+html.sidebar-collapsed .sidebar-user p,
+html.sidebar-collapsed .sidebar-nav a span {
+  display: none !important;
+}
+
+html.sidebar-collapsed .sidebar-avatar {
+  margin: 0 auto;
+}
+
+html.sidebar-collapsed .sidebar-user-info {
+  opacity: 0;
+  visibility: hidden;
+}
+
+html.sidebar-collapsed .sidebar-user {
+  flex-direction: column;
+  padding: 16px 8px;
+  gap: 8px;
+  justify-content: center;
+}
+
+html.sidebar-collapsed .sidebar-nav {
+  padding: 12px 0;
+}
+
+html.sidebar-collapsed .sidebar-nav a {
+  padding: 12px;
+  justify-content: center;
+  position: relative;
+  font-size: 0;
+}
+
+html.sidebar-collapsed .sidebar-nav a svg {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+
+html.sidebar-collapsed .sidebar-logout {
+  padding: 12px 8px;
+  border-top: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+html.sidebar-collapsed .btn-logout {
+  padding: 10px;
+  justify-content: center;
+  align-items: center;
+  gap: 0;
+  font-size: 0;
+  width: auto;
+}
+
+html.sidebar-collapsed .btn-logout svg {
+  width: 20px;
+  height: 20px;
+}
+
 .sidebar.collapsed .sidebar-nav a {
   padding: 10px;
   display: flex;
@@ -37,6 +181,7 @@
 }
 
 .sidebar.collapsed .sidebar-nav a svg {
+  padding: 2px 1px;
   width: 24px;
   height: 24px;
   margin: 0 auto;
@@ -61,6 +206,10 @@
   gap: 0;
   font-size: 0;
   width: auto;
+}
+
+html.sidebar-collapsed .main-content {
+  margin-left: 64px;
 }
 
 .main-content {
@@ -121,7 +270,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: transparent;
   z-index: 999;
   pointer-events: none;
   display: none;
@@ -147,11 +296,13 @@ body {
 }
 
 .login-left {
-  flex: 0 0 640px;
+  flex: 0 0 50%;
+  max-width: 640px;
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #f0f0f5;
+  min-height: 100vh;
 }
 
 .login-right {
@@ -160,20 +311,21 @@ body {
 }
 
 /* Background image for login right panel */
-.login-right-bg {
-  width: 100%;
-  height: 100%;
-  background-image: url('../../images/fcpc-bg.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  position: relative;
+.login-right {
+  flex: 1;
+  min-height: 100vh;
 }
 
+.login-right-bg {
+  width: 100%;
+  height: 100vh;
+  background-image: url('../../images/fcpc-bg.png');
+  background-size: cover;
+  background-position: center top;
+  background-repeat: no-repeat;
+  position: sticky;
+  top: 0;
+}
 .login-card {
   background: #ffffff;
   border-radius: 12px;
@@ -625,12 +777,75 @@ body {
   border-radius: 4px;
   overflow: hidden;
   box-shadow: 0 1px 6px rgba(0,0,0,0.07);
+  position: relative;
+}
+
+.attendance-table-wrapper {
+  overflow-x: auto;
+}
+
+@keyframes skeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.table-wrapper.loading .data-table {
+  opacity: 0;
+}
+
+.table-wrapper.loading .table-skeleton {
+  display: flex;
+}
+
+.table-skeleton {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: #fff;
+  z-index: 2;
+}
+
+.skeleton-header,
+.skeleton-row {
+  display: grid;
+  grid-template-columns: repeat(var(--skeleton-cols, 5), minmax(0, 1fr));
+  gap: 10px;
+}
+
+.skeleton-row {
+  min-height: 40px;
+}
+
+.skeleton-cell {
+  display: block;
+  width: 100%;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #ececec 25%, #f6f6f6 50%, #ececec 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.2s linear infinite;
+}
+
+.skeleton-header .skeleton-cell {
+  height: 14px;
+  opacity: 0.85;
 }
 
 .data-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+.attendance-table {
+  min-width: 1120px;
 }
 
 .data-table thead tr {
@@ -645,6 +860,7 @@ body {
   font-size: 14px;
   letter-spacing: 0.01em;
   border-right: 1px solid rgba(255,255,255,0.15);
+  white-space: nowrap;
 }
 
 .data-table th:last-child {
@@ -672,6 +888,36 @@ body {
   padding: 13px 20px;
   color: #444;
   border-right: none;
+  white-space: nowrap;
+}
+
+.attendance-table th,
+.attendance-table td {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.attendance-table th:nth-child(1),
+.attendance-table td:nth-child(1),
+.attendance-table th:nth-child(2),
+.attendance-table td:nth-child(2),
+.attendance-table th:nth-child(4),
+.attendance-table td:nth-child(4),
+.attendance-table th:nth-child(5),
+.attendance-table td:nth-child(5) {
+  min-width: 120px;
+}
+
+.attendance-table th:nth-child(3),
+.attendance-table td:nth-child(3) {
+  min-width: 180px;
+}
+
+.attendance-table th:nth-child(6),
+.attendance-table td:nth-child(6),
+.attendance-table th:nth-child(7),
+.attendance-table td:nth-child(7) {
+  min-width: 160px;
 }
 
 /* ===== LOGO FALLBACK SVG ===== */
@@ -767,19 +1013,25 @@ body {
 
 /* ===== MODAL STYLING ===== */
 .modal {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
 }
 
 .modal.show {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .modal-overlay {
@@ -788,71 +1040,87 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  z-index: -1;
+  background-color: rgba(12, 21, 76, 0.28);
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.22s ease;
 }
 
 .modal-content {
-  background-color: #2a2a3e;
-  border-radius: 12px;
-  padding: 32px;
-  max-width: 500px;
+  position: relative;
+  background-color: #ffffff;
+  border: 1px solid #d6dbee;
+  border-radius: 10px;
+  padding: 28px;
+  max-width: 460px;
   width: 90%;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  z-index: 1001;
+  box-shadow: 0 10px 28px rgba(16, 24, 64, 0.18);
+  z-index: 1;
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.modal.show .modal-overlay {
+  opacity: 1;
+}
+
+.modal.show .modal-content {
+  opacity: 1;
+  transform: translateY(0) scale(1);
 }
 
 .modal-title {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  color: #fff;
-  margin-bottom: 12px;
+  color: #1a237e;
+  margin-bottom: 10px;
   line-height: 1.2;
 }
 
 .modal-message {
-  font-size: 14px;
-  color: #ccc;
-  margin-bottom: 24px;
+  font-size: 15px;
+  color: #3f4866;
+  margin-bottom: 22px;
   line-height: 1.5;
 }
 
 .modal-buttons {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   justify-content: flex-end;
 }
 
 .modal-btn {
-  padding: 10px 32px;
-  border-radius: 24px;
+  min-width: 108px;
+  padding: 10px 18px;
+  border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  border: 2px solid;
+  border: 1.5px solid;
   cursor: pointer;
-  transition: all 0.2s;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
 }
 
 .modal-btn-confirm {
-  background-color: #6b5bf5;
+  background-color: #1a237e;
   color: #fff;
-  border-color: #6b5bf5;
+  border-color: #1a237e;
 }
 
 .modal-btn-confirm:hover {
-  background-color: #5a4ae0;
-  border-color: #5a4ae0;
+  background-color: #121a66;
+  border-color: #121a66;
 }
 
 .modal-btn-cancel {
-  background-color: transparent;
-  color: #8a8aaa;
-  border-color: #8a8aaa;
+  background-color: #ffffff;
+  color: #1a237e;
+  border-color: #1a237e;
 }
 
 .modal-btn-cancel:hover {
-  color: #a0a0c0;
-  border-color: #a0a0c0;
+  background-color: #f1f3ff;
+  color: #121a66;
+  border-color: #121a66;
 }
