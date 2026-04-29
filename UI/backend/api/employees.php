@@ -28,9 +28,6 @@ $data = array_map(static function (array $employee): array {
         'id' => (int) $employee['id'],
         'employee_number' => $employee['employee_number'],
         'rfid_uid' => $employee['rfid_uid'],
-        'last_name' => $employee['last_name'],
-        'first_name' => $employee['first_name'],
-        'middle_name' => $employee['middle_name'],
         'name' => format_display_name(
             $employee['last_name'],
             $employee['first_name'],
