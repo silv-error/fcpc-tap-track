@@ -47,7 +47,7 @@
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4zm8-4h2v2h-2v2h-2v-2h-2v-2h2V8h2v2z"/>
         </svg>
-        Employee
+        Employees
       </a>
       <a href="attendance.html">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -88,22 +88,39 @@
       <h1 class="page-title">Students</h1>
       <hr class="page-divider" />
 
-      <div class="filters-row">
-        <div class="filter-group">
-          <label for="searchInput">Search</label>
-          <input
-            type="text"
-            id="searchInput"
-            class="filter-input"
-            placeholder="Search by Student No./RFID UID/Name"
-          />
+      <div class="table-toolbar">
+        <div class="filters-row table-toolbar-filters">
+          <div class="filter-group">
+            <label for="searchInput">Search</label>
+            <input
+              type="text"
+              id="searchInput"
+              class="filter-input"
+              placeholder="Search by Student No./RFID UID/Name"
+            />
+          </div>
+          <div class="filter-group">
+            <label for="departmentSelect">Department</label>
+            <select id="departmentSelect" class="filter-select">
+              <option value="all">All Departments</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="yearLevelSelect">Year Level</label>
+            <select id="yearLevelSelect" class="filter-select">
+              <option value="all">All Year Levels</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="courseSelect">Course</label>
+            <select id="courseSelect" class="filter-select">
+              <option value="all">All Courses</option>
+            </select>
+          </div>
         </div>
-
-        <div class="filter-group">
-          <label for="departmentSelect">Department</label>
-          <select id="departmentSelect" class="filter-select">
-            <option value="all">All Departments</option>
-          </select>
+        <div class="table-toolbar-actions">
+          <button id="addStudentBtn" class="toolbar-btn toolbar-btn-primary">+ Add Student</button>
+          <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary">Import</button>
         </div>
       </div>
 
@@ -117,6 +134,7 @@
               <th>Course</th>
               <th>Year Level</th>
               <th>Department</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -148,6 +166,180 @@
     </div>
   </div>
 </div>
+
+
+<!-- View Student Modal -->
+<div id="viewStudentModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Information Overview</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="viewStudentFirstName">First Name:</label>
+        <input id="viewStudentFirstName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentMiddleName">Middle Name:</label>
+        <input id="viewStudentMiddleName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentLastName">Last Name:</label>
+        <input id="viewStudentLastName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentNumber">Student No.:</label>
+        <input id="viewStudentNumber" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentCourse">Course:</label>
+        <input id="viewStudentCourse" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentYearLevel">Year Level:</label>
+        <input id="viewStudentYearLevel" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="viewStudentDepartment">Department:</label>
+        <input id="viewStudentDepartment" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="viewStudentRfid">RFID UID:</label>
+        <input id="viewStudentRfid" type="text" readonly />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-meta-row">
+      <div>
+        <span>Created At:</span>
+        <strong id="viewStudentCreatedAt">-</strong>
+      </div>
+      <div>
+        <span>Updated At:</span>
+        <strong id="viewStudentUpdatedAt">-</strong>
+      </div>
+    </div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn" onclick="closeViewStudentModal()">Back</button>
+    </div>
+  </div>
+</div>
+
+<div id="importModal" class="modal">
+  <div class="modal-overlay" onclick="closeImportModal()"></div>
+  <div class="modal-content import-modal-content">
+    <div class="import-modal-header">
+      <h2 id="importModalTitle" class="modal-title">Upload file</h2>
+      <button class="import-close-btn" type="button" onclick="closeImportModal()">x</button>
+    </div>
+    <div id="importDropzone" class="import-dropzone">
+      <div class="import-excel-icon">
+        <img width="48" height="48" src="https://img.icons8.com/color/48/microsoft-excel-2025.png" alt="microsoft-excel-2025"/>
+      </div>
+      <p>Drag and Drop file here or <label for="importFileInput" class="import-choose-file">Choose file</label></p>
+      <input type="file" id="importFileInput" accept=".xlsx" hidden />
+    </div>
+    <div class="import-meta-row">
+      <span>Supported format: XLSX</span>
+      <span>Maximum size: 25 MB</span>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Student Modal -->
+<div id="editStudentModal" class="modal">
+  <div class="modal-overlay" onclick="closeEditStudentModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Edit Student</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="editStudentFirstName">First Name:</label>
+        <input id="editStudentFirstName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentMiddleName">Middle Name:</label>
+        <input id="editStudentMiddleName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentLastName">Last Name:</label>
+        <input id="editStudentLastName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentNumber">Student No.:</label>
+        <input id="editStudentNumber" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentCourse">Course:</label>
+        <input id="editStudentCourse" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentYearLevel">Year Level:</label>
+        <input id="editStudentYearLevel" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="editStudentDepartment">Department:</label>
+        <input id="editStudentDepartment" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="editStudentRfid" class="edit-label-active">RFID UID:</label>
+        <input id="editStudentRfid" type="text" class="edit-input-active" />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeEditStudentModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveEditStudent()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Student Modal -->
+<div id="addStudentModal" class="modal">
+  <div class="modal-overlay" onclick="closeAddStudentModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Add Student</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="addStudentFirstName">First Name:</label>
+        <input id="addStudentFirstName" type="text" class="edit-input-active" placeholder="First name" />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentMiddleName">Middle Name:</label>
+        <input id="addStudentMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentLastName">Last Name:</label>
+        <input id="addStudentLastName" type="text" class="edit-input-active" placeholder="Last name" />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentNumber">Student No.:</label>
+        <input id="addStudentNumber" type="text" class="edit-input-active" placeholder="Student No." />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentCourse">Course:</label>
+        <input id="addStudentCourse" type="text" class="edit-input-active" placeholder="e.g. BSIT" />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentYearLevel">Year Level:</label>
+        <input id="addStudentYearLevel" type="text" class="edit-input-active" placeholder="e.g. 1st Year" />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="addStudentDepartment">Department:</label>
+        <input id="addStudentDepartment" type="text" class="edit-input-active" placeholder="Department" />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="addStudentRfid">RFID UID:</label>
+        <input id="addStudentRfid" type="text" class="edit-input-active" placeholder="RFID UID" />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeAddStudentModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveAddStudent()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="appToast" class="app-toast"></div>
 
 <script src="assets/js/script.js"></script>
 </body>

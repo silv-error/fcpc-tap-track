@@ -87,22 +87,35 @@
       <h1 class="page-title">Employees</h1>
       <hr class="page-divider" />
 
-      <div class="filters-row">
-        <div class="filter-group">
-          <label for="searchInput">Search</label>
-          <input
-            type="text"
-            id="searchInput"
-            class="filter-input"
-            placeholder="Search by Employee No./RFID UID/Name"
-          />
-        </div>
+      <div class="table-toolbar">
+        <div class="filters-row table-toolbar-filters">
+          <div class="filter-group">
+            <label for="searchInput">Search</label>
+            <input
+              type="text"
+              id="searchInput"
+              class="filter-input"
+              placeholder="Search by Employee No./RFID UID/Name"
+            />
+          </div>
 
-        <div class="filter-group">
-          <label for="departmentSelect">Department</label>
-          <select id="departmentSelect" class="filter-select">
-            <option value="all">All Departments</option>
-          </select>
+          <div class="filter-group">
+            <label for="departmentSelect">Department</label>
+            <select id="departmentSelect" class="filter-select">
+              <option value="all">All Departments</option>
+            </select>
+          </div>
+
+          <div class="filter-group">
+            <label for="positionSelect">Position</label>
+            <select id="positionSelect" class="filter-select">
+              <option value="all">All Positions</option>
+            </select>
+          </div>
+        </div>
+        <div class="table-toolbar-actions">
+          <button id="addEmployeeBtn" class="toolbar-btn toolbar-btn-primary">+ Add Employee</button>
+          <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary">Import</button>
         </div>
       </div>
 
@@ -115,6 +128,7 @@
               <th>Name</th>
               <th>Position</th>
               <th>Department</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -146,6 +160,168 @@
     </div>
   </div>
 </div>
+
+<!-- Edit Employee Modal removed -->
+
+<div id="viewEmployeeModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Information Overview</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="viewEmployeeFirstName">First Name:</label>
+        <input id="viewEmployeeFirstName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewEmployeeMiddleName">Middle Name:</label>
+        <input id="viewEmployeeMiddleName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewEmployeeLastName">Last Name:</label>
+        <input id="viewEmployeeLastName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewEmployeeNumber">Employee ID:</label>
+        <input id="viewEmployeeNumber" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="viewEmployeeDepartment">Department:</label>
+        <input id="viewEmployeeDepartment" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="viewEmployeePosition">Designation/Position:</label>
+        <input id="viewEmployeePosition" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="viewEmployeeRfid">RFID UID:</label>
+        <input id="viewEmployeeRfid" type="text" readonly />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-meta-row">
+      <div>
+        <span>Created At:</span>
+        <strong id="viewEmployeeCreatedAt">-</strong>
+      </div>
+      <div>
+        <span>Updated At:</span>
+        <strong id="viewEmployeeUpdatedAt">-</strong>
+      </div>
+    </div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn" onclick="closeViewEmployeeModal()">Back</button>
+    </div>
+  </div>
+</div>
+
+<div id="importModal" class="modal">
+  <div class="modal-overlay" onclick="closeImportModal()"></div>
+  <div class="modal-content import-modal-content">
+    <div class="import-modal-header">
+      <h2 id="importModalTitle" class="modal-title">Upload file</h2>
+      <button class="import-close-btn" type="button" onclick="closeImportModal()">x</button>
+    </div>
+    <div id="importDropzone" class="import-dropzone">
+      <div class="import-excel-icon">
+        <img width="48" height="48" src="https://img.icons8.com/color/48/microsoft-excel-2025.png" alt="microsoft-excel-2025"/>
+      </div>
+      <p>Drag and Drop file here or <label for="importFileInput" class="import-choose-file">Choose file</label></p>
+      <input type="file" id="importFileInput" accept=".xlsx" hidden />
+    </div>
+    <div class="import-meta-row">
+      <span>Supported format: XLSX</span>
+      <span>Maximum size: 25 MB</span>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Employee Modal -->
+<div id="editEmployeeModal" class="modal">
+  <div class="modal-overlay" onclick="closeEditEmployeeModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Edit Employee</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="editEmployeeFirstName">First Name:</label>
+        <input id="editEmployeeFirstName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editEmployeeMiddleName">Middle Name:</label>
+        <input id="editEmployeeMiddleName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editEmployeeLastName">Last Name:</label>
+        <input id="editEmployeeLastName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editEmployeeNumber">Employee No.:</label>
+        <input id="editEmployeeNumber" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="editEmployeeDepartment">Department:</label>
+        <input id="editEmployeeDepartment" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="editEmployeePosition">Designation/Position:</label>
+        <input id="editEmployeePosition" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="editEmployeeRfid" class="edit-label-active">RFID UID:</label>
+        <input id="editEmployeeRfid" type="text" class="edit-input-active" />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeEditEmployeeModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveEditEmployee()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Employee Modal -->
+<div id="addEmployeeModal" class="modal">
+  <div class="modal-overlay" onclick="closeAddEmployeeModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Add Employee</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="addEmployeeFirstName">First Name:</label>
+        <input id="addEmployeeFirstName" type="text" class="edit-input-active" placeholder="First name" />
+      </div>
+      <div class="overview-field">
+        <label for="addEmployeeMiddleName">Middle Name:</label>
+        <input id="addEmployeeMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
+      </div>
+      <div class="overview-field">
+        <label for="addEmployeeLastName">Last Name:</label>
+        <input id="addEmployeeLastName" type="text" class="edit-input-active" placeholder="Last name" />
+      </div>
+      <div class="overview-field">
+        <label for="addEmployeeNumber">Employee No.:</label>
+        <input id="addEmployeeNumber" type="text" class="edit-input-active" placeholder="e.g. EMP-00001" />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="addEmployeeDepartment">Department:</label>
+        <input id="addEmployeeDepartment" type="text" class="edit-input-active" placeholder="Department" />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="addEmployeePosition">Designation/Position:</label>
+        <input id="addEmployeePosition" type="text" class="edit-input-active" placeholder="e.g. Instructor" />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="addEmployeeRfid">RFID UID:</label>
+        <input id="addEmployeeRfid" type="text" class="edit-input-active" placeholder="RFID UID" />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeAddEmployeeModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveAddEmployee()">Add</button>
+    </div>
+  </div>
+</div>
+
+<div id="appToast" class="app-toast"></div>
 
 <script src="assets/js/script.js"></script>
 </body>

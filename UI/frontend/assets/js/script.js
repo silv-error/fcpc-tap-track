@@ -8,6 +8,10 @@ const tableState = {
   currentPage: 1,
 };
 
+const importState = {
+  entity: '',
+};
+
 function escapeText(value) {
   return value === null || value === undefined || value === '' ? '-' : String(value);
 }
@@ -20,6 +24,50 @@ function normalizeDate(value) {
 function formatTime(value) {
   if (!value || value === '-') return '-';
   return String(value).slice(0, 5);
+}
+
+function parseNameParts(record) {
+  if (!record) {
+    return { lastName: '-', firstName: '-', middleName: '-' };
+  }
+
+  if (record.last_name || record.first_name || record.middle_name) {
+    return {
+      lastName: escapeText(record.last_name),
+      firstName: escapeText(record.first_name),
+      middleName: escapeText(record.middle_name),
+    };
+  }
+
+  const fullName = String(record.name || '').trim();
+  if (!fullName) {
+    return { lastName: '-', firstName: '-', middleName: '-' };
+  }
+
+  const [lastRaw, firstRaw = ''] = fullName.split(',');
+  const firstParts = firstRaw.trim().split(/\s+/).filter(Boolean);
+
+  return {
+    lastName: escapeText((lastRaw || '').trim()),
+    firstName: escapeText(firstParts[0] || '-'),
+    middleName: escapeText(firstParts.slice(1).join(' ') || '-'),
+  };
+}
+
+function showToast(message, type = 'success') {
+  const toast = document.getElementById('appToast');
+  if (!toast) {
+    alert(message);
+    return;
+  }
+
+  toast.textContent = message;
+  toast.className = `app-toast show ${type}`;
+
+  window.clearTimeout(showToast._timer);
+  showToast._timer = window.setTimeout(() => {
+    toast.className = 'app-toast';
+  }, 2600);
 }
 
 function inferPageType(table) {
@@ -53,8 +101,11 @@ function buildRowModel(pageType, record) {
         ],
         searchText: [record.student_number, record.rfid_uid, record.name, record.course, record.year_level, record.department].join(' ').toLowerCase(),
         department: escapeText(record.department),
+        yearLevel: escapeText(record.year_level),
+        course: escapeText(record.course),
         typeValue: '',
         dateValue: normalizeDate(record.created_at),
+        record,
       };
     case 'employees':
       return {
@@ -67,8 +118,10 @@ function buildRowModel(pageType, record) {
         ],
         searchText: [record.employee_number, record.rfid_uid, record.name, record.position, record.department].join(' ').toLowerCase(),
         department: escapeText(record.department),
+        position: escapeText(record.position),
         typeValue: '',
         dateValue: normalizeDate(record.created_at),
+        record,
       };
     case 'attendance':
       return {
@@ -83,13 +136,14 @@ function buildRowModel(pageType, record) {
         ],
         searchText: [record.reference_number, record.name, record.department, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
         department: escapeText(record.department),
-        typeValue: escapeText(record.status),
+        typeValue: escapeText(record.record_type),
         dateValue: normalizeDate(record.log_date),
       };
     case 'users':
       return {
         cells: [
           escapeText(record.id),
+          escapeText(record.username),
           escapeText(record.name),
           escapeText(record.email),
           escapeText(record.role),
@@ -248,8 +302,57 @@ function renderCurrentPage() {
       row.appendChild(cell);
     });
 
+    if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
+      const actionCell = document.createElement('td');
+      const actionWrap = document.createElement('div');
+      actionWrap.className = 'row-actions';
+
+      const viewBtn = document.createElement('button');
+      viewBtn.className = 'row-action-btn view';
+      viewBtn.textContent = 'View';
+      viewBtn.onclick = (event) => {
+        event.preventDefault();
+        if (tableState.pageType === 'students') {
+          openViewStudentModal(record);
+        } else {
+          openViewEmployeeModal(record);
+        }
+      };
+
+      const editBtn = document.createElement('button');
+      editBtn.className = 'row-action-btn edit';
+      editBtn.textContent = 'Edit';
+      editBtn.onclick = (event) => {
+        event.preventDefault();
+        if (tableState.pageType === 'students') {
+          openEditStudentModal(record);
+        } else {
+          openEditEmployeeModal(record);
+        }
+      };
+
+      actionWrap.appendChild(viewBtn);
+      actionWrap.appendChild(editBtn);
+      actionCell.appendChild(actionWrap);
+      row.appendChild(actionCell);
+    }
+
     tbody.appendChild(row);
   });
+
+  // Add empty rows to pad to 9 rows
+  const emptyRowsNeeded = rowsPerPage - pageRows.length;
+  const colCount = table.querySelectorAll('thead th').length;
+  for (let i = 0; i < emptyRowsNeeded; i++) {
+    const emptyRow = document.createElement('tr');
+    emptyRow.className = 'empty-row';
+    for (let j = 0; j < colCount; j++) {
+      const cell = document.createElement('td');
+      cell.textContent = '';
+      emptyRow.appendChild(cell);
+    }
+    tbody.appendChild(emptyRow);
+  }
 
   updatePagination(totalPages);
 }
@@ -285,14 +388,25 @@ function applyFilters() {
   const dateVal = normalizeDate(dateInput?.value || '');
   const departmentVal = (departmentSelect?.value || 'all').trim().toLowerCase();
 
+  const yearLevelSelect = document.getElementById('yearLevelSelect');
+  const courseSelect = document.getElementById('courseSelect');
+  const positionSelect = document.getElementById('positionSelect');
+
+  const yearLevelVal = (yearLevelSelect?.value || 'all').trim().toLowerCase();
+  const courseVal = (courseSelect?.value || 'all').trim().toLowerCase();
+  const positionVal = (positionSelect?.value || 'all').trim().toLowerCase();
+
   tableState.filteredRows = tableState.rows.filter((record) => {
     const model = buildRowModel(tableState.pageType, record);
     const matchesSearch = !searchVal || model.searchText.includes(searchVal);
     const matchesType = !typeVal || typeVal === 'all' || model.typeValue.toLowerCase() === typeVal;
     const matchesDate = !dateVal || model.dateValue === dateVal;
     const matchesDepartment = !departmentVal || departmentVal === 'all' || model.department.toLowerCase() === departmentVal;
+    const matchesYearLevel = !yearLevelVal || yearLevelVal === 'all' || model.yearLevel?.toLowerCase() === yearLevelVal;
+    const matchesCourse = !courseVal || courseVal === 'all' || model.course?.toLowerCase() === courseVal;
+    const matchesPosition = !positionVal || positionVal === 'all' || model.position?.toLowerCase() === positionVal;
 
-    return matchesSearch && matchesType && matchesDate && matchesDepartment;
+    return matchesSearch && matchesType && matchesDate && matchesDepartment && matchesYearLevel && matchesCourse && matchesPosition;
   });
 
   tableState.currentPage = 1;
@@ -309,6 +423,8 @@ function bindTableControls() {
   typeSelect?.addEventListener('change', applyFilters);
   dateInput?.addEventListener('change', applyFilters);
   departmentSelect?.addEventListener('change', applyFilters);
+  
+  bindAdditionalFilterControls();
 }
 
 async function loadTableData() {
@@ -325,6 +441,11 @@ async function loadTableData() {
   if (tbody) {
     tbody.innerHTML = '';
   }
+
+  // Show skeleton
+  const skeleton = document.querySelector('.table-skeleton');
+  if (skeleton) skeleton.style.display = 'flex';
+  table.style.visibility = 'hidden';
 
   try {
     const response = await fetch(endpoint, {
@@ -347,6 +468,13 @@ async function loadTableData() {
       populateDepartmentSelect(rows);
     }
 
+    if (tableState.pageType === 'students') {
+      populateYearLevelSelect(rows);
+      populateCourseSelect(rows);
+    } else if (tableState.pageType === 'employees') {
+      populatePositionSelect(rows);
+    }
+    
     bindTableControls();
     renderCurrentPage();
   } catch (error) {
@@ -356,6 +484,10 @@ async function loadTableData() {
     if (paginationDiv) {
       paginationDiv.style.display = 'none';
     }
+  } finally {
+    // Hide skeleton and show table
+    if (skeleton) skeleton.style.display = 'none';
+    table.style.visibility = 'visible';
   }
 }
 
@@ -517,6 +649,434 @@ function openDatePicker() {
   if (input) input.showPicker ? input.showPicker() : input.click();
 }
 
+// ===== ADD USER MODAL =====
+function openAddUserModal() {
+  const modal = document.getElementById('addUserModal');
+  if (!modal) return;
+  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  const roleSelect = document.getElementById('role');
+  const statusSelect = document.getElementById('status');
+  if (roleSelect) roleSelect.value = '';
+  if (statusSelect) statusSelect.value = 'Active';
+  modal.classList.add('show');
+}
+
+function closeAddUserModal() {
+  const modal = document.getElementById('addUserModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveAddUser() {
+  const get = (id) => document.getElementById(id)?.value.trim() || '';
+  const employeeNo = get('empNo');
+  const username = get('username');
+  const firstName = get('first_name');
+  const lastName = get('last_name');
+  const email = get('email');
+  const role = get('role');
+
+  if (!employeeNo || !username || !firstName || !lastName || !email || !role) {
+    showToast('Please fill in all required fields.', 'error');
+    return;
+  }
+  // TODO: send POST to backend
+  showToast('User added successfully.', 'success');
+  closeAddUserModal();
+}
+
+function openViewStudentModal(record) {
+  const modal = document.getElementById('viewStudentModal');
+  if (!modal) return;
+
+  const parts = parseNameParts(record);
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = escapeText(value);
+  };
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = escapeText(value);
+  };
+
+  setValue('viewStudentLastName', parts.lastName);
+  setValue('viewStudentFirstName', parts.firstName);
+  setValue('viewStudentMiddleName', parts.middleName);
+  setValue('viewStudentCourse', record.course);
+  setValue('viewStudentYearLevel', record.year_level);
+  setValue('viewStudentDepartment', record.department);
+  setValue('viewStudentNumber', record.student_number);
+  setValue('viewStudentRfid', record.rfid_uid);
+  setText('viewStudentCreatedAt', record.created_at || '-');
+  setText('viewStudentUpdatedAt', record.updated_at || '-');
+
+  modal.classList.add('show');
+}
+
+function closeViewStudentModal() {
+  const modal = document.getElementById('viewStudentModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function openViewEmployeeModal(record) {
+  const modal = document.getElementById('viewEmployeeModal');
+  if (!modal) return;
+
+  const parts = parseNameParts(record);
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = escapeText(value);
+  };
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = escapeText(value);
+  };
+
+  setValue('viewEmployeeLastName', parts.lastName);
+  setValue('viewEmployeeFirstName', parts.firstName);
+  setValue('viewEmployeeMiddleName', parts.middleName);
+  setValue('viewEmployeePosition', record.position);
+  setValue('viewEmployeeDepartment', record.department);
+  setValue('viewEmployeeNumber', record.employee_number);
+  setValue('viewEmployeeRfid', record.rfid_uid);
+  setText('viewEmployeeCreatedAt', record.created_at || '-');
+  setText('viewEmployeeUpdatedAt', record.updated_at || '-');
+
+  modal.classList.add('show');
+}
+
+function closeViewEmployeeModal() {
+  const modal = document.getElementById('viewEmployeeModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function openImportModal(entity) {
+  const modal = document.getElementById('importModal');
+  if (!modal) return;
+
+  importState.entity = entity;
+  const title = document.getElementById('importModalTitle');
+  if (title) {
+    title.textContent = `Upload ${entity === 'students' ? 'Student' : 'Employee'} File`;
+  }
+
+  modal.classList.add('show');
+}
+
+function closeImportModal() {
+  const modal = document.getElementById('importModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function handleImportFile(file) {
+  if (!file) return;
+
+  const fileName = String(file.name || '').toLowerCase();
+  const maxSize = 25 * 1024 * 1024;
+
+  if (!fileName.endsWith('.xlsx')) {
+    showToast('Import failed: only .xlsx files are allowed.', 'error');
+    return;
+  }
+
+  if (file.size > maxSize) {
+    showToast('Import failed: file is larger than 25 MB.', 'error');
+    return;
+  }
+
+  showToast(`Import file accepted for ${importState.entity || 'selected'} records.`, 'success');
+  closeImportModal();
+}
+
+function bindImportControls() {
+  const openBtn = document.getElementById('openImportBtn');
+  const fileInput = document.getElementById('importFileInput');
+  const dropzone = document.getElementById('importDropzone');
+
+  const entity = tableState.pageType === 'students' ? 'students' : tableState.pageType === 'employees' ? 'employees' : '';
+
+  openBtn?.addEventListener('click', () => {
+    if (!entity) return;
+    openImportModal(entity);
+  });
+
+  fileInput?.addEventListener('change', (event) => {
+    const file = event.target?.files?.[0];
+    handleImportFile(file);
+    event.target.value = '';
+  });
+
+  if (dropzone) {
+    dropzone.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      dropzone.classList.add('is-dragover');
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('is-dragover');
+    });
+
+    dropzone.addEventListener('drop', (event) => {
+      event.preventDefault();
+      dropzone.classList.remove('is-dragover');
+      const file = event.dataTransfer?.files?.[0];
+      handleImportFile(file);
+    });
+  }
+}
+
+function bindAddButtons() {
+  const addStudentBtn = document.getElementById('addStudentBtn');
+  const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+
+  addStudentBtn?.addEventListener('click', () => {
+    showToast('Add Student form will open here.', 'success');
+  });
+
+  addEmployeeBtn?.addEventListener('click', () => {
+    showToast('Add Employee form will open here.', 'success');
+  });
+}
+
+function closeAddUserModal() {
+  const modal = document.getElementById('addUserModal');
+  if (modal) {
+    modal.classList.remove('show');
+  }
+}
+
+// ===== EDIT STUDENT MODAL =====
+function openEditStudentModal(record) {
+  const modal = document.getElementById('editStudentModal');
+  if (!modal) {
+    showToast('Edit modal not found.', 'error');
+    return;
+  }
+
+  const parts = parseNameParts(record);
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = escapeText(value);
+  };
+
+  setValue('editStudentFirstName', parts.firstName);
+  setValue('editStudentMiddleName', parts.middleName);
+  setValue('editStudentLastName', parts.lastName);
+  setValue('editStudentNumber', record.student_number);
+  setValue('editStudentCourse', record.course);
+  setValue('editStudentYearLevel', record.year_level);
+  setValue('editStudentDepartment', record.department);
+  setValue('editStudentRfid', record.rfid_uid);
+
+  modal._record = record;
+  modal.classList.add('show');
+}
+
+function closeEditStudentModal() {
+  const modal = document.getElementById('editStudentModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveEditStudent() {
+  const rfid = document.getElementById('editStudentRfid')?.value.trim();
+  if (!rfid) {
+    showToast('RFID UID cannot be empty.', 'error');
+    return;
+  }
+  // TODO: send PATCH/PUT to backend with updated rfid
+  showToast('Student RFID updated successfully.', 'success');
+  closeEditStudentModal();
+}
+
+function openAddStudentModal() {
+  const modal = document.getElementById('addStudentModal');
+  if (!modal) return;
+  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.classList.add('show');
+}
+
+function closeAddStudentModal() {
+  const modal = document.getElementById('addStudentModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveAddStudent() {
+  const get = (id) => document.getElementById(id)?.value.trim() || '';
+  const firstName = get('addStudentFirstName');
+  const lastName = get('addStudentLastName');
+  const studentNumber = get('addStudentNumber');
+
+  if (!firstName || !lastName || !studentNumber) {
+    showToast('First name, last name, and student number are required.', 'error');
+    return;
+  }
+  // TODO: send POST to backend
+  showToast('Student added successfully.', 'success');
+  closeAddStudentModal();
+}
+
+// ===== EDIT EMPLOYEE MODAL =====
+function openEditEmployeeModal(record) {
+  const modal = document.getElementById('editEmployeeModal');
+  if (!modal) {
+    showToast('Edit modal not found.', 'error');
+    return;
+  }
+
+  const parts = parseNameParts(record);
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = escapeText(value);
+  };
+
+  setValue('editEmployeeFirstName', parts.firstName);
+  setValue('editEmployeeMiddleName', parts.middleName);
+  setValue('editEmployeeLastName', parts.lastName);
+  setValue('editEmployeeNumber', record.employee_number);
+  setValue('editEmployeeDepartment', record.department);
+  setValue('editEmployeePosition', record.position);
+  setValue('editEmployeeRfid', record.rfid_uid);
+
+  modal._record = record;
+  modal.classList.add('show');
+}
+
+function closeEditEmployeeModal() {
+  const modal = document.getElementById('editEmployeeModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveEditEmployee() {
+  const rfid = document.getElementById('editEmployeeRfid')?.value.trim();
+  if (!rfid) {
+    showToast('RFID UID cannot be empty.', 'error');
+    return;
+  }
+  // TODO: send PATCH/PUT to backend with updated rfid
+  showToast('Employee RFID updated successfully.', 'success');
+  closeEditEmployeeModal();
+}
+
+function openAddEmployeeModal() {
+  const modal = document.getElementById('addEmployeeModal');
+  if (!modal) return;
+  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.classList.add('show');
+}
+
+function closeAddEmployeeModal() {
+  const modal = document.getElementById('addEmployeeModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveAddEmployee() {
+  const get = (id) => document.getElementById(id)?.value.trim() || '';
+  const firstName = get('addEmployeeFirstName');
+  const lastName = get('addEmployeeLastName');
+  const employeeNumber = get('addEmployeeNumber');
+
+  if (!firstName || !lastName || !employeeNumber) {
+    showToast('First name, last name, and employee number are required.', 'error');
+    return;
+  }
+  // TODO: send POST to backend
+  showToast('Employee added successfully.', 'success');
+  closeAddEmployeeModal();
+}
+
+// ===== BIND ADD BUTTONS =====
+function bindAddButtons() {
+  const addStudentBtn = document.getElementById('addStudentBtn');
+  const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+
+  addStudentBtn?.addEventListener('click', openAddStudentModal);
+  addEmployeeBtn?.addEventListener('click', openAddEmployeeModal);
+}
+
+// ===== POPULATE FILTER SELECTS =====
+function populateYearLevelSelect(rows) {
+  const select = document.getElementById('yearLevelSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const yearLevels = [...new Set(rows.map((row) => row.year_level).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Year Levels</option>';
+  yearLevels.forEach((yearLevel) => {
+    const option = document.createElement('option');
+    option.value = yearLevel;
+    option.textContent = yearLevel;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((option) => option.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
+function populateCourseSelect(rows) {
+  const select = document.getElementById('courseSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const courses = [...new Set(rows.map((row) => row.course).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Courses</option>';
+  courses.forEach((course) => {
+    const option = document.createElement('option');
+    option.value = course;
+    option.textContent = course;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((option) => option.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
+function populatePositionSelect(rows) {
+  const select = document.getElementById('positionSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const positions = [...new Set(rows.map((row) => row.position).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Positions</option>';
+  positions.forEach((position) => {
+    const option = document.createElement('option');
+    option.value = position;
+    option.textContent = position;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((option) => option.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
+// ===== BIND ADDITIONAL FILTER CONTROLS =====
+function bindAdditionalFilterControls() {
+  const yearLevelSelect = document.getElementById('yearLevelSelect');
+  const courseSelect = document.getElementById('courseSelect');
+  const positionSelect = document.getElementById('positionSelect');
+
+  yearLevelSelect?.addEventListener('change', () => {
+    tableState.currentPage = 1;
+    applyFilters();
+  });
+  
+  courseSelect?.addEventListener('change', () => {
+    tableState.currentPage = 1;
+    applyFilters();
+  });
+  
+  positionSelect?.addEventListener('change', () => {
+    tableState.currentPage = 1;
+    applyFilters();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const sidebar = document.querySelector('.sidebar');
   if (sidebar) {
@@ -535,6 +1095,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLoadingSkeletons();
 
   await loadTableData();
+  bindImportControls();
+  bindAddButtons();
 
   const currentPage = window.location.pathname.split('/').pop();
   document.querySelectorAll('.sidebar-nav a').forEach((link) => {
