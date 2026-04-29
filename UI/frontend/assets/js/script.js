@@ -1021,6 +1021,8 @@ function openAddStudentModal() {
   const modal = document.getElementById('addStudentModal');
   if (!modal) return;
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  const yearLevelSelect = document.getElementById('addStudentYearLevel');
+  if (yearLevelSelect) yearLevelSelect.value = '';
   modal.classList.add('show');
 }
 
@@ -1090,6 +1092,8 @@ function openAddEmployeeModal() {
   const modal = document.getElementById('addEmployeeModal');
   if (!modal) return;
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  const departmentSelect = document.getElementById('addEmployeeDepartment');
+  if (departmentSelect) departmentSelect.value = '';
   modal.classList.add('show');
 }
 

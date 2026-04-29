@@ -300,9 +300,16 @@
         <label for="addEmployeeNumber">Employee No.:</label>
         <input id="addEmployeeNumber" type="text" class="edit-input-active" placeholder="e.g. EMP-00001" />
       </div>
-      <div class="overview-field overview-field-full">
+      <div class="overview-field overview-select-field overview-field-full">
         <label for="addEmployeeDepartment">Department:</label>
-        <input id="addEmployeeDepartment" type="text" class="edit-input-active" placeholder="Department" />
+        <div class="overview-select-wrap">
+          <select id="addEmployeeDepartment" class="edit-input-active overview-select">
+            <option value="">Select Department</option>
+            <option value="CCS">CCS</option>
+            <option value="CICS">CICS</option>
+            <option value="Admin Office">Admin Office</option>
+          </select>
+        </div>
       </div>
       <div class="overview-field overview-field-full">
         <label for="addEmployeePosition">Designation/Position:</label>
