@@ -302,7 +302,7 @@ function renderCurrentPage() {
       row.appendChild(cell);
     });
 
-    if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
+    if (tableState.pageType === 'students' || tableState.pageType === 'employees' || tableState.pageType === 'users') {
       const actionCell = document.createElement('td');
       const actionWrap = document.createElement('div');
       actionWrap.className = 'row-actions';
@@ -314,8 +314,10 @@ function renderCurrentPage() {
         event.preventDefault();
         if (tableState.pageType === 'students') {
           openViewStudentModal(record);
-        } else {
+        } else if (tableState.pageType === 'employees') {
           openViewEmployeeModal(record);
+        } else if (tableState.pageType === 'users') {
+          openViewUserModal(record);
         }
       };
 
@@ -326,8 +328,10 @@ function renderCurrentPage() {
         event.preventDefault();
         if (tableState.pageType === 'students') {
           openEditStudentModal(record);
-        } else {
+        } else if (tableState.pageType === 'employees') {
           openEditEmployeeModal(record);
+        } else if (tableState.pageType === 'users') {
+          openEditUserModal(record);
         }
       };
 
@@ -668,20 +672,107 @@ function closeAddUserModal() {
 
 function saveAddUser() {
   const get = (id) => document.getElementById(id)?.value.trim() || '';
-  const employeeNo = get('empNo');
   const username = get('username');
   const firstName = get('first_name');
   const lastName = get('last_name');
   const email = get('email');
   const role = get('role');
 
-  if (!employeeNo || !username || !firstName || !lastName || !email || !role) {
+  if (!username || !firstName || !lastName || !email || !role) {
     showToast('Please fill in all required fields.', 'error');
     return;
   }
   // TODO: send POST to backend
   showToast('User added successfully.', 'success');
   closeAddUserModal();
+}
+
+// ===== VIEW USER MODAL =====
+function openViewUserModal(record) {
+  const modal = document.getElementById('viewUserModal');
+  if (!modal) return;
+
+  const parts = parseNameParts(record);
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = escapeText(value);
+  };
+
+  const setText = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = escapeText(value);
+  };
+
+  setValue('viewUserUsername', record.username);
+  setValue('viewUserFirstName', parts.firstName);
+  setValue('viewUserMiddleName', parts.middleName);
+  setValue('viewUserLastName', parts.lastName);
+  setValue('viewUserEmail', record.email);
+  setValue('viewUserRole', record.role);
+  setValue('viewUserStatus', record.status);
+  setText('viewUserCreatedAt', record.created_at || '-');
+  setText('viewUserUpdatedAt', record.updated_at || '-');
+
+  modal.classList.add('show');
+}
+
+function closeViewUserModal() {
+  const modal = document.getElementById('viewUserModal');
+  if (modal) modal.classList.remove('show');
+}
+
+// ===== EDIT USER MODAL =====
+function openEditUserModal(record) {
+  const modal = document.getElementById('editUserModal');
+  if (!modal) {
+    showToast('Edit modal not found.', 'error');
+    return;
+  }
+
+  const parts = parseNameParts(record);
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) el.value = escapeText(value);
+  };
+
+  setValue('editUserUsername', record.username);
+  setValue('editUserFirstName', parts.firstName);
+  setValue('editUserMiddleName', parts.middleName);
+  setValue('editUserLastName', parts.lastName);
+  setValue('editUserEmail', record.email);
+  
+  const roleSelect = document.getElementById('editUserRole');
+  if (roleSelect) roleSelect.value = record.role || '';
+  
+  const statusSelect = document.getElementById('editUserStatus');
+  if (statusSelect) statusSelect.value = record.status || 'Active';
+
+  modal._record = record;
+  modal.classList.add('show');
+}
+
+function closeEditUserModal() {
+  const modal = document.getElementById('editUserModal');
+  if (modal) modal.classList.remove('show');
+}
+
+function saveEditUser() {
+  const get = (id) => document.getElementById(id)?.value.trim() || '';
+  const username = get('editUserUsername');
+  const firstName = get('editUserFirstName');
+  const lastName = get('editUserLastName');
+  const email = get('editUserEmail');
+  const role = get('editUserRole');
+  const status = get('editUserStatus');
+
+  if (!username || !firstName || !lastName || !email || !role || !status) {
+    showToast('Please fill in all required fields.', 'error');
+    return;
+  }
+
+  // TODO: send PATCH/PUT to backend with updated user data
+  showToast('User updated successfully.', 'success');
+  closeEditUserModal();
 }
 
 function openViewStudentModal(record) {

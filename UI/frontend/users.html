@@ -161,6 +161,7 @@
               <th>Status</th>
               <th>Created At</th>
               <th>Updated At</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -201,10 +202,6 @@
   <div class="modal-content overview-modal-content">
     <div class="overview-header">Add New User</div>
     <div class="overview-grid">
-      <div class="overview-field">
-        <label for="empNo">Employee No.:</label>
-        <input id="empNo" type="text" name="employee_number" class="edit-input-active" placeholder="Employee No." />
-      </div>
       <div class="overview-field">
         <label for="username">Username:</label>
         <input id="username" type="text" name="username" class="edit-input-active" placeholder="Username" />
@@ -248,6 +245,110 @@
     </div>
   </div>
 </div>
+
+<!-- View User Modal -->
+<div id="viewUserModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Information Overview</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="viewUserUsername">Username:</label>
+        <input id="viewUserUsername" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserFirstName">First Name:</label>
+        <input id="viewUserFirstName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserMiddleName">Middle Name:</label>
+        <input id="viewUserMiddleName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserLastName">Last Name:</label>
+        <input id="viewUserLastName" type="text" readonly />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="viewUserEmail">Email:</label>
+        <input id="viewUserEmail" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserRole">Role:</label>
+        <input id="viewUserRole" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserStatus">Status:</label>
+        <input id="viewUserStatus" type="text" readonly />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-meta-row">
+      <div>
+        <span>Created At:</span>
+        <strong id="viewUserCreatedAt">-</strong>
+      </div>
+      <div>
+        <span>Updated At:</span>
+        <strong id="viewUserUpdatedAt">-</strong>
+      </div>
+    </div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn" onclick="closeViewUserModal()">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editUserModal" class="modal">
+  <div class="modal-overlay" onclick="closeEditUserModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Edit User</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="editUserUsername">Username:</label>
+        <input id="editUserUsername" type="text" class="edit-input-active" />
+      </div>
+      <div class="overview-field">
+        <label for="editUserFirstName">First Name:</label>
+        <input id="editUserFirstName" type="text" class="edit-input-active" />
+      </div>
+      <div class="overview-field">
+        <label for="editUserMiddleName">Middle Name:</label>
+        <input id="editUserMiddleName" type="text" class="edit-input-active" />
+      </div>
+      <div class="overview-field">
+        <label for="editUserLastName">Last Name:</label>
+        <input id="editUserLastName" type="text" class="edit-input-active" />
+      </div>
+      <div class="overview-field overview-field-full">
+        <label for="editUserEmail">Email:</label>
+        <input id="editUserEmail" type="text" class="edit-input-active" />
+      </div>
+      <div class="overview-field">
+        <label for="editUserRole">Role:</label>
+        <select id="editUserRole" class="edit-input-active overview-select">
+          <option value="">Select Role</option>
+          <option value="Admin">Admin</option>
+          <option value="Superadmin">Super Admin</option>
+        </select>
+      </div>
+      <div class="overview-field">
+        <label for="editUserStatus">Status:</label>
+        <select id="editUserStatus" class="edit-input-active overview-select">
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeEditUserModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveEditUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<div id="appToast" class="app-toast"></div>
 
 <script src="assets/js/script.js"></script>
 </body>
