@@ -24,27 +24,25 @@ $sql = "
 
 $students = fetch_all_rows($con, $sql);
 
-$data = array_map(static function (array $student): array {
-    return [
-        'id' => (int) $student['id'],
-        'student_number' => $student['student_number'],
-        'rfid_uid' => $student['rfid_uid'],
-        'name' => format_display_name(
-            $student['last_name'],
-            $student['first_name'],
-            $student['middle_name'],
-            $student['suffix']
-        ),
-        'course' => $student['course'] ?: '-',
-        'year_level' => $student['year_level'] ?: '-',
-        'department' => $student['department'] ?: '-',
-        'is_active' => (bool) $student['is_active'],
-        'created_at' => $student['created_at'],
-        'updated_at' => $student['updated_at'],
-    ];
-}, $students);
-
 json_response([
     'success' => true,
-    'data' => $data,
+    'data'    => array_map(static function (array $student): array {
+        return [
+            'id'             => (int) $student['id'],
+            'student_number' => $student['student_number'],
+            'rfid_uid'       => $student['rfid_uid']    ?: '-',
+            'name'           => format_display_name(
+                $student['last_name'],
+                $student['first_name'],
+                $student['middle_name'],
+                $student['suffix'],
+            ),
+            'course'         => $student['course']      ?: '-',
+            'year_level'     => $student['year_level']  ?: '-',
+            'department'     => $student['department']  ?: '-',
+            'is_active'      => (bool) $student['is_active'],
+            'created_at'     => $student['created_at'],
+            'updated_at'     => $student['updated_at'],
+        ];
+    }, $students),
 ]);

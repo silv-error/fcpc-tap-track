@@ -29,13 +29,63 @@ function format_display_name(string $lastName, string $firstName, ?string $middl
     }
 
     $displayName = trim(implode(' ', $parts));
-    $suffix = trim((string) $suffix);
+    $suffix      = trim((string) $suffix);
 
     if ($suffix !== '') {
         $displayName .= ' ' . $suffix;
     }
 
     return $displayName;
+}
+
+/**
+ * Resolves the display name for an attendance log row.
+ *
+ * Accepts the flat row returned by the JOIN query and builds the name entirely
+ * in PHP so the SQL stays DB-agnostic (works with both MySQL and SQLite).
+ *
+ * Expected row keys (nullable):
+ *   s_last_name, s_first_name, s_middle_name, s_suffix   – from students
+ *   e_last_name, e_first_name, e_middle_name, e_suffix   – from employees
+ */
+function resolve_display_name(array $row): string
+{
+    // Prefer student, fall back to employee, fall back to placeholder
+    foreach (['s', 'e'] as $prefix) {
+        $last = trim((string) ($row["{$prefix}_last_name"]  ?? ''));
+        $first = trim((string) ($row["{$prefix}_first_name"] ?? ''));
+
+        if ($last !== '' && $first !== '') {
+            return format_display_name(
+                $last,
+                $first,
+                $row["{$prefix}_middle_name"] ?? null,
+                $row["{$prefix}_suffix"]      ?? null,
+            );
+        }
+    }
+
+    return '-';
+}
+
+/**
+ * Resolves the reference number (student_number / employee_number) for a log row.
+ */
+function resolve_reference_number(array $row): string
+{
+    return trim((string) ($row['s_reference_number'] ?? ''))
+        ?: trim((string) ($row['e_reference_number'] ?? ''))
+        ?: '-';
+}
+
+/**
+ * Resolves the department for a log row.
+ */
+function resolve_department(array $row): string
+{
+    return trim((string) ($row['s_department'] ?? ''))
+        ?: trim((string) ($row['e_department'] ?? ''))
+        ?: '-';
 }
 
 function fetch_all_rows(mysqli $con, string $sql): array
@@ -46,7 +96,7 @@ function fetch_all_rows(mysqli $con, string $sql): array
         json_response([
             'success' => false,
             'message' => mysqli_error($con),
-            'data' => [],
+            'data'    => [],
         ], 500);
     }
 
