@@ -153,7 +153,7 @@
         <table class="data-table" data-endpoint="../backend/api/users.php" data-table-type="users">
           <thead>
             <tr>
-              <th>ID</th>
+              <th>Employee No.</th>
               <th>Username</th>
               <th>Name</th>
               <th>Email</th>
@@ -200,54 +200,241 @@
   <div class="modal-overlay" onclick="closeAddUserModal()"></div>
   <div class="modal-content overview-modal-content">
     <div class="overview-header">Add New User</div>
-    <div class="overview-grid">
-      <div class="overview-field">
-        <label for="empNo">Employee No.:</label>
-        <input id="empNo" type="text" name="employee_number" class="edit-input-active" placeholder="Employee No." />
+
+    <!-- Step 1: Employee search -->
+    <div id="empSearchSection">
+      <div class="overview-field" style="margin-bottom:8px;">
+        <label for="empSearchInput">Search Employee (Name or ID):</label>
+        <input
+          id="empSearchInput"
+          type="text"
+          class="edit-input-active"
+          placeholder="Type employee number or name..."
+          autocomplete="off"
+          oninput="onEmpSearchInput()"
+        />
       </div>
-      <div class="overview-field">
-        <label for="username">Username:</label>
-        <input id="username" type="text" name="username" class="edit-input-active" placeholder="Username" />
-      </div>
-      <div class="overview-field">
-        <label for="first_name">First Name:</label>
-        <input id="first_name" type="text" name="first_name" class="edit-input-active" placeholder="First name" />
-      </div>
-      <div class="overview-field">
-        <label for="middle_name">Middle Name:</label>
-        <input id="middle_name" type="text" name="middle_name" class="edit-input-active" placeholder="Middle name" />
-      </div>
-      <div class="overview-field">
-        <label for="last_name">Last Name:</label>
-        <input id="last_name" type="text" name="last_name" class="edit-input-active" placeholder="Last name" />
-      </div>
-      <div class="overview-field">
-        <label for="email">Email:</label>
-        <input id="email" type="email" name="email" class="edit-input-active" placeholder="email@fcpc.edu.ph" />
-      </div>
-      <div class="overview-field">
-        <label for="role">Role:</label>
-        <select id="role" name="role" class="edit-input-active overview-select">
-          <option value="">Select Role</option>
-          <option value="Admin">Admin</option>
-          <option value="Superadmin">Super Admin</option>
-        </select>
-      </div>
-      <div class="overview-field">
-        <label for="status">Status:</label>
-        <select id="status" name="status" class="edit-input-active overview-select">
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+      <div id="empSearchResults" style="border:1px solid #ccc; border-radius:4px; max-height:180px; overflow-y:auto; display:none;"></div>
+    </div>
+
+    <!-- Selected employee banner (hidden until picked) -->
+    <div id="empSelectedBanner" style="display:none; background:#e8eaf6; border-radius:6px; padding:8px 12px; font-size:14px; align-items:center; justify-content:space-between;">
+      <span id="empSelectedLabel"></span>
+      <button type="button" onclick="clearSelectedEmployee()" style="background:none;border:none;cursor:pointer;color:#c62828;font-size:18px;line-height:1;">&#x2715;</button>
+    </div>
+
+    <!-- Step 2: Remaining fields (hidden until employee selected) -->
+    <div id="empUserFields" style="display:none;">
+      <!-- Read-only auto-filled fields -->
+      <div class="overview-grid" style="margin-top:10px;">
+        <div class="overview-field">
+          <label>Employee No.:</label>
+          <input id="viewEmpNo" type="text" class="edit-input-active" readonly style="background:#f5f5f5; color:#555;" />
+        </div>
+        <div class="overview-field">
+          <label>First Name:</label>
+          <input id="viewFirstName" type="text" class="edit-input-active" readonly style="background:#f5f5f5; color:#555;" />
+        </div>
+        <div class="overview-field">
+          <label>Middle Name:</label>
+          <input id="viewMiddleName" type="text" class="edit-input-active" readonly style="background:#f5f5f5; color:#555;" />
+        </div>
+        <div class="overview-field">
+          <label>Last Name:</label>
+          <input id="viewLastName" type="text" class="edit-input-active" readonly style="background:#f5f5f5; color:#555;" />
+        </div>
+        <div class="overview-field">
+          <label>Department:</label>
+          <input id="viewDepartment" type="text" class="edit-input-active" readonly style="background:#f5f5f5; color:#555;" />
+        </div>
+
+        <!-- Editable fields -->
+        <div class="overview-field">
+          <label for="newUsername">Username: <span style="color:red">*</span></label>
+          <input id="newUsername" type="text" class="edit-input-active" placeholder="Username" />
+        </div>
+        <div class="overview-field">
+          <label for="newEmail">Email: <span style="color:red">*</span></label>
+          <input id="newEmail" type="email" class="edit-input-active" placeholder="email@fcpc.edu.ph" />
+        </div>
+        <div class="overview-field">
+          <label for="newRole">Role: <span style="color:red">*</span></label>
+          <select id="newRole" class="edit-input-active overview-select">
+            <option value="">Select Role</option>
+            <option value="Admin">Admin</option>
+            <option value="Superadmin">Super Admin</option>
+          </select>
+        </div>
+        <div class="overview-field">
+          <label for="newStatus">Status:</label>
+          <select id="newStatus" class="edit-input-active overview-select">
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+        </div>
       </div>
     </div>
+
     <div class="overview-divider"></div>
     <div class="overview-actions">
       <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeAddUserModal()">Cancel</button>
-      <button type="button" class="overview-back-btn" onclick="saveAddUser()">Add User</button>
+      <button type="button" class="overview-back-btn" id="saveUserBtn" onclick="saveAddUser()" style="display:none;">Add User</button>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  let _selectedEmployee = null;
+  let _searchTimer = null;
+
+  window.openAddUserModal = function () {
+    resetAddUserModal();
+    document.getElementById('addUserModal').classList.add('show');
+  };
+
+  window.closeAddUserModal = function () {
+    document.getElementById('addUserModal').classList.remove('show');
+  };
+
+  function resetAddUserModal() {
+    _selectedEmployee = null;
+    document.getElementById('empSearchInput').value = '';
+    document.getElementById('empSearchResults').innerHTML = '';
+    document.getElementById('empSearchResults').style.display = 'none';
+    document.getElementById('empSelectedBanner').style.display = 'none';
+    document.getElementById('empUserFields').style.display = 'none';
+    document.getElementById('saveUserBtn').style.display = 'none';
+    document.getElementById('newUsername').value = '';
+    document.getElementById('newEmail').value = '';
+    document.getElementById('newRole').value = '';
+    document.getElementById('newStatus').value = 'Active';
+  }
+
+  window.onEmpSearchInput = function () {
+    clearTimeout(_searchTimer);
+    const q = document.getElementById('empSearchInput').value.trim();
+    const resultsBox = document.getElementById('empSearchResults');
+
+    if (q.length < 1) {
+      resultsBox.style.display = 'none';
+      resultsBox.innerHTML = '';
+      return;
+    }
+
+    _searchTimer = setTimeout(async () => {
+      try {
+        const res = await fetch(`../backend/api/employees-search.php?q=${encodeURIComponent(q)}`);
+        const json = await res.json();
+
+        if (!json.success || json.data.length === 0) {
+          resultsBox.innerHTML = '<div style="padding:10px 14px;color:#888;font-size:13px;">No matching employees found.</div>';
+          resultsBox.style.display = 'block';
+          return;
+        }
+
+        resultsBox.innerHTML = json.data.map(emp => `
+          <div
+            class="emp-result-item"
+            style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;"
+            onmouseenter="this.style.background='#e8eaf6'"
+            onmouseleave="this.style.background=''"
+            onclick="selectEmployee(${JSON.stringify(emp).replace(/"/g, '&quot;')})"
+          >
+            <strong>${emp.employee_number}</strong> — ${emp.display_name}
+            ${emp.department ? `<span style="color:#888;margin-left:6px;">(${emp.department})</span>` : ''}
+          </div>
+        `).join('');
+        resultsBox.style.display = 'block';
+      } catch (e) {
+        console.error('Employee search failed:', e);
+      }
+    }, 300);
+  };
+
+  window.selectEmployee = function (emp) {
+    _selectedEmployee = emp;
+
+    // Hide search, show banner
+    document.getElementById('empSearchResults').style.display = 'none';
+    document.getElementById('empSearchInput').value = '';
+
+    const banner = document.getElementById('empSelectedBanner');
+    document.getElementById('empSelectedLabel').textContent =
+      `Selected: ${emp.employee_number} — ${emp.display_name}`;
+    banner.style.cssText = banner.style.cssText; // keep existing styles
+    banner.style.display = 'flex';
+
+    // Populate read-only fields
+    document.getElementById('viewEmpNo').value      = emp.employee_number;
+    document.getElementById('viewFirstName').value  = emp.first_name;
+    document.getElementById('viewMiddleName').value = emp.middle_name;
+    document.getElementById('viewLastName').value   = emp.last_name;
+    document.getElementById('viewDepartment').value = emp.department;
+
+    document.getElementById('empUserFields').style.display = 'block';
+    document.getElementById('saveUserBtn').style.display   = '';
+  };
+
+  window.clearSelectedEmployee = function () {
+    _selectedEmployee = null;
+    document.getElementById('empSelectedBanner').style.display = 'none';
+    document.getElementById('empUserFields').style.display = 'none';
+    document.getElementById('saveUserBtn').style.display = 'none';
+  };
+
+  window.saveAddUser = async function () {
+    if (!_selectedEmployee) {
+      alert('Please select an employee first.');
+      return;
+    }
+
+    const username = document.getElementById('newUsername').value.trim();
+    const email    = document.getElementById('newEmail').value.trim();
+    const role     = document.getElementById('newRole').value;
+    const status   = document.getElementById('newStatus').value;
+
+    if (!username) { alert('Username is required.'); return; }
+    if (!email)    { alert('Email is required.'); return; }
+    if (!role)     { alert('Please select a role.'); return; }
+
+    const btn = document.getElementById('saveUserBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      const res = await fetch('../backend/api/users.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: _selectedEmployee.id,
+          username,
+          email,
+          role,
+          status,
+        }),
+      });
+
+      const json = await res.json();
+
+      if (json.success) {
+        closeAddUserModal();
+        // Reload the table — call whatever your script.js exposes
+        if (typeof loadTableData === 'function') loadTableData();
+        else location.reload();
+      } else {
+        alert(json.message || 'Failed to add user.');
+      }
+    } catch (e) {
+      alert('An unexpected error occurred.');
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Add User';
+    }
+  };
+})();
+</script>
 
 <script src="assets/js/script.js"></script>
 </body>

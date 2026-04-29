@@ -76,10 +76,10 @@ function inferPageType(table) {
   }
 
   const page = window.location.pathname.split('/').pop();
-  if (page === 'students.html') return 'students';
-  if (page === 'employee.html') return 'employees';
+  if (page === 'students.html')  return 'students';
+  if (page === 'employee.html')  return 'employees';
   if (page === 'attendance.html') return 'attendance';
-  if (page === 'users.html') return 'users';
+  if (page === 'users.html')     return 'users';
   return 'generic';
 }
 
@@ -142,16 +142,16 @@ function buildRowModel(pageType, record) {
     case 'users':
       return {
         cells: [
-          escapeText(record.id),
+          escapeText(record.employee_number),   // ← was record.id
           escapeText(record.username),
           escapeText(record.name),
           escapeText(record.email),
           escapeText(record.role),
-          escapeText(record.status),
+          record.is_active ? 'Active' : 'Inactive',
           escapeText(record.created_at),
           escapeText(record.updated_at),
         ],
-        searchText: [record.id, record.username, record.name, record.email, record.role, record.status].join(' ').toLowerCase(),
+        searchText: [record.employee_number, record.username, record.name, record.email, record.role].join(' ').toLowerCase(),
         department: '',
         typeValue: escapeText(record.role),
         dateValue: normalizeDate(record.created_at),
@@ -199,25 +199,16 @@ function renderPageNumbers(totalPages) {
     pages.push(1);
 
     const start = Math.max(2, tableState.currentPage - 1);
-    const end = Math.min(totalPages - 1, tableState.currentPage + 1);
+    const end   = Math.min(totalPages - 1, tableState.currentPage + 1);
 
-    if (start > 2) {
-      pages.push('...');
-    }
+    if (start > 2) pages.push('...');
 
     for (let index = start; index <= end; index += 1) {
-      if (!pages.includes(index)) {
-        pages.push(index);
-      }
+      if (!pages.includes(index)) pages.push(index);
     }
 
-    if (end < totalPages - 1) {
-      pages.push('...');
-    }
-
-    if (!pages.includes(totalPages)) {
-      pages.push(totalPages);
-    }
+    if (end < totalPages - 1) pages.push('...');
+    if (!pages.includes(totalPages)) pages.push(totalPages);
   }
 
   pages.forEach((page) => {
@@ -231,9 +222,7 @@ function renderPageNumbers(totalPages) {
 
     const button = document.createElement('button');
     button.className = 'pg-btn';
-    if (page === tableState.currentPage) {
-      button.classList.add('active');
-    }
+    if (page === tableState.currentPage) button.classList.add('active');
     button.textContent = page;
     button.onclick = () => goToPage(page);
     pageNumbersDiv.appendChild(button);
@@ -270,7 +259,7 @@ function renderCurrentPage() {
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / rowsPerPage));
   tableState.currentPage = Math.min(tableState.currentPage, totalPages);
 
-  const start = (tableState.currentPage - 1) * rowsPerPage;
+  const start    = (tableState.currentPage - 1) * rowsPerPage;
   const pageRows = filteredRows.slice(start, start + rowsPerPage);
 
   tbody.innerHTML = '';
@@ -285,15 +274,9 @@ function renderCurrentPage() {
     const model = buildRowModel(tableState.pageType, record);
     const row = document.createElement('tr');
 
-    if (record.department) {
-      row.dataset.department = record.department;
-    }
-    if (model.typeValue) {
-      row.dataset.type = model.typeValue;
-    }
-    if (model.dateValue) {
-      row.dataset.date = model.dateValue;
-    }
+    if (record.department)  row.dataset.department = record.department;
+    if (model.typeValue)    row.dataset.type        = model.typeValue;
+    if (model.dateValue)    row.dataset.date        = model.dateValue;
     row.dataset.searchText = model.searchText;
 
     model.cells.forEach((cellValue) => {
@@ -340,16 +323,13 @@ function renderCurrentPage() {
     tbody.appendChild(row);
   });
 
-  // Add empty rows to pad to 9 rows
-  const emptyRowsNeeded = rowsPerPage - pageRows.length;
+  // Pad to rowsPerPage with empty rows to keep table height stable
   const colCount = table.querySelectorAll('thead th').length;
-  for (let i = 0; i < emptyRowsNeeded; i++) {
+  for (let i = pageRows.length; i < rowsPerPage; i++) {
     const emptyRow = document.createElement('tr');
     emptyRow.className = 'empty-row';
     for (let j = 0; j < colCount; j++) {
-      const cell = document.createElement('td');
-      cell.textContent = '';
-      emptyRow.appendChild(cell);
+      emptyRow.appendChild(document.createElement('td'));
     }
     tbody.appendChild(emptyRow);
   }
@@ -372,58 +352,119 @@ function populateDepartmentSelect(rows) {
     departmentSelect.appendChild(option);
   });
 
-  if ([...departmentSelect.options].some((option) => option.value === existingValue)) {
+  if ([...departmentSelect.options].some((o) => o.value === existingValue)) {
     departmentSelect.value = existingValue;
   }
 }
 
+function populateYearLevelSelect(rows) {
+  const select = document.getElementById('yearLevelSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const yearLevels = [...new Set(rows.map((row) => row.year_level).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Year Levels</option>';
+  yearLevels.forEach((yearLevel) => {
+    const option = document.createElement('option');
+    option.value = yearLevel;
+    option.textContent = yearLevel;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((o) => o.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
+function populateCourseSelect(rows) {
+  const select = document.getElementById('courseSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const courses = [...new Set(rows.map((row) => row.course).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Courses</option>';
+  courses.forEach((course) => {
+    const option = document.createElement('option');
+    option.value = course;
+    option.textContent = course;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((o) => o.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
+function populatePositionSelect(rows) {
+  const select = document.getElementById('positionSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const positions = [...new Set(rows.map((row) => row.position).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Positions</option>';
+  positions.forEach((position) => {
+    const option = document.createElement('option');
+    option.value = position;
+    option.textContent = position;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((o) => o.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
 function applyFilters() {
-  const searchInput = document.getElementById('searchInput');
-  const typeSelect = document.getElementById('typeSelect');
-  const dateInput = document.getElementById('dateInput');
+  const searchInput      = document.getElementById('searchInput');
+  const typeSelect       = document.getElementById('typeSelect');
+  const dateInput        = document.getElementById('dateInput');
   const departmentSelect = document.getElementById('departmentSelect');
+  const yearLevelSelect  = document.getElementById('yearLevelSelect');
+  const courseSelect     = document.getElementById('courseSelect');
+  const positionSelect   = document.getElementById('positionSelect');
 
-  const searchVal = (searchInput?.value || '').trim().toLowerCase();
-  const typeVal = (typeSelect?.value || 'all').trim().toLowerCase();
-  const dateVal = normalizeDate(dateInput?.value || '');
-  const departmentVal = (departmentSelect?.value || 'all').trim().toLowerCase();
-
-  const yearLevelSelect = document.getElementById('yearLevelSelect');
-  const courseSelect = document.getElementById('courseSelect');
-  const positionSelect = document.getElementById('positionSelect');
-
-  const yearLevelVal = (yearLevelSelect?.value || 'all').trim().toLowerCase();
-  const courseVal = (courseSelect?.value || 'all').trim().toLowerCase();
-  const positionVal = (positionSelect?.value || 'all').trim().toLowerCase();
+  const searchVal     = (searchInput?.value      || '').trim().toLowerCase();
+  const typeVal       = (typeSelect?.value        || 'all').trim().toLowerCase();
+  const dateVal       = normalizeDate(dateInput?.value || '');
+  const departmentVal = (departmentSelect?.value  || 'all').trim().toLowerCase();
+  const yearLevelVal  = (yearLevelSelect?.value   || 'all').trim().toLowerCase();
+  const courseVal     = (courseSelect?.value      || 'all').trim().toLowerCase();
+  const positionVal   = (positionSelect?.value    || 'all').trim().toLowerCase();
 
   tableState.filteredRows = tableState.rows.filter((record) => {
     const model = buildRowModel(tableState.pageType, record);
-    const matchesSearch = !searchVal || model.searchText.includes(searchVal);
-    const matchesType = !typeVal || typeVal === 'all' || model.typeValue.toLowerCase() === typeVal;
-    const matchesDate = !dateVal || model.dateValue === dateVal;
-    const matchesDepartment = !departmentVal || departmentVal === 'all' || model.department.toLowerCase() === departmentVal;
-    const matchesYearLevel = !yearLevelVal || yearLevelVal === 'all' || model.yearLevel?.toLowerCase() === yearLevelVal;
-    const matchesCourse = !courseVal || courseVal === 'all' || model.course?.toLowerCase() === courseVal;
-    const matchesPosition = !positionVal || positionVal === 'all' || model.position?.toLowerCase() === positionVal;
-
-    return matchesSearch && matchesType && matchesDate && matchesDepartment && matchesYearLevel && matchesCourse && matchesPosition;
+    return (
+      (!searchVal     || model.searchText.includes(searchVal))                              &&
+      (!typeVal       || typeVal       === 'all' || model.typeValue.toLowerCase()  === typeVal)  &&
+      (!dateVal       || model.dateValue === dateVal)                                        &&
+      (!departmentVal || departmentVal === 'all' || model.department.toLowerCase() === departmentVal) &&
+      (!yearLevelVal  || yearLevelVal  === 'all' || model.yearLevel?.toLowerCase()  === yearLevelVal) &&
+      (!courseVal     || courseVal     === 'all' || model.course?.toLowerCase()     === courseVal)    &&
+      (!positionVal   || positionVal   === 'all' || model.position?.toLowerCase()   === positionVal)
+    );
   });
 
   tableState.currentPage = 1;
   renderCurrentPage();
 }
 
-function bindTableControls() {
-  const searchInput = document.getElementById('searchInput');
-  const typeSelect = document.getElementById('typeSelect');
-  const dateInput = document.getElementById('dateInput');
-  const departmentSelect = document.getElementById('departmentSelect');
+function bindAdditionalFilterControls() {
+  ['yearLevelSelect', 'courseSelect', 'positionSelect'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', () => {
+      tableState.currentPage = 1;
+      applyFilters();
+    });
+  });
+}
 
-  searchInput?.addEventListener('input', applyFilters);
-  typeSelect?.addEventListener('change', applyFilters);
-  dateInput?.addEventListener('change', applyFilters);
-  departmentSelect?.addEventListener('change', applyFilters);
-  
+function bindTableControls() {
+  document.getElementById('searchInput')?.addEventListener('input', applyFilters);
+  document.getElementById('typeSelect')?.addEventListener('change', applyFilters);
+  document.getElementById('dateInput')?.addEventListener('change', applyFilters);
+  document.getElementById('departmentSelect')?.addEventListener('change', applyFilters);
   bindAdditionalFilterControls();
 }
 
@@ -434,34 +475,25 @@ async function loadTableData() {
   const endpoint = getEndpoint(table);
   if (!endpoint) return;
 
-  tableState.table = table;
+  tableState.table    = table;
   tableState.pageType = inferPageType(table);
 
   const tbody = table.querySelector('tbody');
-  if (tbody) {
-    tbody.innerHTML = '';
-  }
+  if (tbody) tbody.innerHTML = '';
 
-  // Show skeleton
   const skeleton = document.querySelector('.table-skeleton');
   if (skeleton) skeleton.style.display = 'flex';
   table.style.visibility = 'hidden';
 
   try {
-    const response = await fetch(endpoint, {
-      headers: {
-        Accept: 'application/json',
-      },
-    });
+    const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
 
-    if (!response.ok) {
-      throw new Error(`Request failed with status ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
 
     const payload = await response.json();
-    const rows = Array.isArray(payload.data) ? payload.data : [];
+    const rows    = Array.isArray(payload.data) ? payload.data : [];
 
-    tableState.rows = rows;
+    tableState.rows         = rows;
     tableState.filteredRows = rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
@@ -474,18 +506,14 @@ async function loadTableData() {
     } else if (tableState.pageType === 'employees') {
       populatePositionSelect(rows);
     }
-    
+
     bindTableControls();
     renderCurrentPage();
   } catch (error) {
     console.error('Failed to load table data:', error);
     renderNoDataRow(table, 'Unable to load records.');
-    const paginationDiv = document.querySelector('.pagination');
-    if (paginationDiv) {
-      paginationDiv.style.display = 'none';
-    }
+    document.querySelector('.pagination')?.style.setProperty('display', 'none');
   } finally {
-    // Hide skeleton and show table
     if (skeleton) skeleton.style.display = 'none';
     table.style.visibility = 'visible';
   }
@@ -494,38 +522,28 @@ async function loadTableData() {
 function goToPage(pageNum) {
   const totalPages = Math.max(1, Math.ceil(tableState.filteredRows.length / rowsPerPage));
   if (pageNum < 1 || pageNum > totalPages) return;
-
   tableState.currentPage = pageNum;
   renderCurrentPage();
 }
 
 function nextPage() {
   const totalPages = Math.max(1, Math.ceil(tableState.filteredRows.length / rowsPerPage));
-  if (tableState.currentPage < totalPages) {
-    goToPage(tableState.currentPage + 1);
-  }
+  if (tableState.currentPage < totalPages) goToPage(tableState.currentPage + 1);
 }
 
 function prevPage() {
-  if (tableState.currentPage > 1) {
-    goToPage(tableState.currentPage - 1);
-  }
+  if (tableState.currentPage > 1) goToPage(tableState.currentPage - 1);
 }
 
 function navigateWithTransition(href) {
   const overlay = document.getElementById('pageTransitionOverlay');
-  if (overlay) {
-    overlay.classList.add('active');
-  }
-
-  setTimeout(() => {
-    window.location.href = href;
-  }, 300);
+  if (overlay) overlay.classList.add('active');
+  setTimeout(() => { window.location.href = href; }, 300);
 }
 
 function togglePassword() {
   const input = document.getElementById('password');
-  const btn = document.querySelector('.toggle-password');
+  const btn   = document.querySelector('.toggle-password');
   if (!input || !btn) return;
 
   if (input.type === 'password') {
@@ -552,7 +570,7 @@ function togglePassword() {
 function handleLogin(e) {
   if (e) e.preventDefault();
 
-  const email = document.getElementById('email')?.value.trim();
+  const email    = document.getElementById('email')?.value.trim();
   const password = document.getElementById('password')?.value;
 
   if (!email || !password) {
@@ -584,7 +602,7 @@ function initLoadingSkeletons() {
     const table = wrapper.querySelector('.data-table');
     if (!table || table.dataset.endpoint) return;
 
-    const columns = table.querySelectorAll('thead th').length || 5;
+    const columns  = table.querySelectorAll('thead th').length || 5;
     const rowCount = 6;
 
     const skeleton = document.createElement('div');
@@ -622,17 +640,14 @@ function initLoadingSkeletons() {
 }
 
 function handleLogout() {
-  const modal = document.getElementById('logoutModal');
+  const modal      = document.getElementById('logoutModal');
   const confirmBtn = document.getElementById('logoutConfirm');
-  const cancelBtn = document.getElementById('logoutCancel');
-
+  const cancelBtn  = document.getElementById('logoutCancel');
   if (!modal) return;
 
   modal.classList.add('show');
 
-  const confirmHandler = () => {
-    navigateWithTransition('index.html');
-  };
+  const confirmHandler = () => navigateWithTransition('index.html');
 
   const cancelHandler = () => {
     modal.classList.remove('show');
@@ -649,107 +664,301 @@ function openDatePicker() {
   if (input) input.showPicker ? input.showPicker() : input.click();
 }
 
-// ===== ADD USER MODAL =====
+// ── Shared API helper ─────────────────────────────────────────────────────────
+
+async function apiRequest(endpoint, method, body) {
+  const response = await fetch(endpoint, {
+    method,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok || !payload.success) {
+    throw new Error(payload.message || `Request failed (${response.status})`);
+  }
+
+  return payload;
+}
+
+// ── Reload helper — refreshes table without a full page reload ────────────────
+
+async function reloadTable() {
+  const table = tableState.table;
+  if (!table) return;
+
+  const endpoint = getEndpoint(table);
+  if (!endpoint) return;
+
+  try {
+    const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Status ${response.status}`);
+
+    const payload = await response.json();
+    const rows    = Array.isArray(payload.data) ? payload.data : [];
+
+    tableState.rows         = rows;
+    tableState.filteredRows = rows.slice();
+
+    if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
+      populateDepartmentSelect(rows);
+    }
+
+    if (tableState.pageType === 'students') {
+      populateYearLevelSelect(rows);
+      populateCourseSelect(rows);
+    } else if (tableState.pageType === 'employees') {
+      populatePositionSelect(rows);
+    }
+
+    applyFilters();
+  } catch (error) {
+    console.error('Failed to reload table:', error);
+  }
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+// openAddUserModal / closeAddUserModal / saveAddUser are defined inline in
+// users.html (the employee-search modal script) and take precedence here.
+// These stubs are kept so other pages that include script.js don't break.
 function openAddUserModal() {
-  const modal = document.getElementById('addUserModal');
-  if (!modal) return;
-  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
-  const roleSelect = document.getElementById('role');
-  const statusSelect = document.getElementById('status');
-  if (roleSelect) roleSelect.value = '';
-  if (statusSelect) statusSelect.value = 'Active';
-  modal.classList.add('show');
+  document.getElementById('addUserModal')?.classList.add('show');
 }
 
 function closeAddUserModal() {
-  const modal = document.getElementById('addUserModal');
-  if (modal) modal.classList.remove('show');
+  document.getElementById('addUserModal')?.classList.remove('show');
 }
 
-function saveAddUser() {
-  const get = (id) => document.getElementById(id)?.value.trim() || '';
-  const employeeNo = get('empNo');
-  const username = get('username');
-  const firstName = get('first_name');
-  const lastName = get('last_name');
-  const email = get('email');
-  const role = get('role');
-
-  if (!employeeNo || !username || !firstName || !lastName || !email || !role) {
-    showToast('Please fill in all required fields.', 'error');
-    return;
-  }
-  // TODO: send POST to backend
-  showToast('User added successfully.', 'success');
-  closeAddUserModal();
+// saveAddUser is fully handled by the inline <script> in users.html.
+// Defining a no-op here prevents "not defined" errors on other pages.
+if (typeof saveAddUser === 'undefined') {
+  window.saveAddUser = function () {};
 }
+
+// ── Students ──────────────────────────────────────────────────────────────────
 
 function openViewStudentModal(record) {
   const modal = document.getElementById('viewStudentModal');
   if (!modal) return;
 
-  const parts = parseNameParts(record);
-  const setValue = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.value = escapeText(value);
-  };
+  const parts    = parseNameParts(record);
+  const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value     = escapeText(value); };
+  const setText  = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = escapeText(value); };
 
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = escapeText(value);
-  };
-
-  setValue('viewStudentLastName', parts.lastName);
-  setValue('viewStudentFirstName', parts.firstName);
+  setValue('viewStudentLastName',   parts.lastName);
+  setValue('viewStudentFirstName',  parts.firstName);
   setValue('viewStudentMiddleName', parts.middleName);
-  setValue('viewStudentCourse', record.course);
-  setValue('viewStudentYearLevel', record.year_level);
+  setValue('viewStudentNumber',     record.student_number);
+  setValue('viewStudentCourse',     record.course);
+  setValue('viewStudentYearLevel',  record.year_level);
   setValue('viewStudentDepartment', record.department);
-  setValue('viewStudentNumber', record.student_number);
-  setValue('viewStudentRfid', record.rfid_uid);
-  setText('viewStudentCreatedAt', record.created_at || '-');
-  setText('viewStudentUpdatedAt', record.updated_at || '-');
+  setValue('viewStudentRfid',       record.rfid_uid);
+  setText('viewStudentCreatedAt',   record.created_at || '-');
+  setText('viewStudentUpdatedAt',   record.updated_at || '-');
 
   modal.classList.add('show');
 }
 
 function closeViewStudentModal() {
-  const modal = document.getElementById('viewStudentModal');
-  if (modal) modal.classList.remove('show');
+  document.getElementById('viewStudentModal')?.classList.remove('show');
 }
+
+function openEditStudentModal(record) {
+  const modal = document.getElementById('editStudentModal');
+  if (!modal) { showToast('Edit modal not found.', 'error'); return; }
+
+  const parts    = parseNameParts(record);
+  const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = escapeText(value); };
+
+  setValue('editStudentFirstName',  parts.firstName);
+  setValue('editStudentMiddleName', parts.middleName);
+  setValue('editStudentLastName',   parts.lastName);
+  setValue('editStudentNumber',     record.student_number);
+  setValue('editStudentCourse',     record.course);
+  setValue('editStudentYearLevel',  record.year_level);
+  setValue('editStudentDepartment', record.department);
+  setValue('editStudentRfid',       record.rfid_uid !== '-' ? record.rfid_uid : '');
+
+  modal._record = record;
+  modal.classList.add('show');
+}
+
+function closeEditStudentModal() {
+  document.getElementById('editStudentModal')?.classList.remove('show');
+}
+
+async function saveEditStudent() {
+  const modal  = document.getElementById('editStudentModal');
+  const record = modal?._record;
+
+  if (!record?.id) { showToast('Student record not found.', 'error'); return; }
+
+  const rfid = document.getElementById('editStudentRfid')?.value.trim() || '';
+
+  try {
+    const endpoint = getEndpoint(tableState.table) || '../backend/api/students.php';
+    await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
+    showToast('Student RFID updated successfully.', 'success');
+    closeEditStudentModal();
+    await reloadTable();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function openAddStudentModal() {
+  const modal = document.getElementById('addStudentModal');
+  if (!modal) return;
+  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.classList.add('show');
+}
+
+function closeAddStudentModal() {
+  document.getElementById('addStudentModal')?.classList.remove('show');
+}
+
+async function saveAddStudent() {
+  const get = (id) => document.getElementById(id)?.value.trim() || '';
+
+  const body = {
+    first_name:      get('addStudentFirstName'),
+    middle_name:     get('addStudentMiddleName'),
+    last_name:       get('addStudentLastName'),
+    student_number:  get('addStudentNumber'),
+    course:          get('addStudentCourse'),
+    year_level:      get('addStudentYearLevel'),
+    department:      get('addStudentDepartment'),
+    rfid_uid:        get('addStudentRfid'),
+  };
+
+  if (!body.first_name || !body.last_name || !body.student_number) {
+    showToast('First name, last name, and student number are required.', 'error');
+    return;
+  }
+
+  try {
+    const endpoint = getEndpoint(tableState.table) || '../backend/api/students.php';
+    await apiRequest(endpoint, 'POST', body);
+    showToast('Student added successfully.', 'success');
+    closeAddStudentModal();
+    await reloadTable();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+// ── Employees ─────────────────────────────────────────────────────────────────
 
 function openViewEmployeeModal(record) {
   const modal = document.getElementById('viewEmployeeModal');
   if (!modal) return;
 
-  const parts = parseNameParts(record);
-  const setValue = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.value = escapeText(value);
-  };
+  const parts    = parseNameParts(record);
+  const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value      = escapeText(value); };
+  const setText  = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = escapeText(value); };
 
-  const setText = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = escapeText(value);
-  };
-
-  setValue('viewEmployeeLastName', parts.lastName);
-  setValue('viewEmployeeFirstName', parts.firstName);
+  setValue('viewEmployeeLastName',   parts.lastName);
+  setValue('viewEmployeeFirstName',  parts.firstName);
   setValue('viewEmployeeMiddleName', parts.middleName);
-  setValue('viewEmployeePosition', record.position);
+  setValue('viewEmployeeNumber',     record.employee_number);
   setValue('viewEmployeeDepartment', record.department);
-  setValue('viewEmployeeNumber', record.employee_number);
-  setValue('viewEmployeeRfid', record.rfid_uid);
-  setText('viewEmployeeCreatedAt', record.created_at || '-');
-  setText('viewEmployeeUpdatedAt', record.updated_at || '-');
+  setValue('viewEmployeePosition',   record.position);
+  setValue('viewEmployeeRfid',       record.rfid_uid);
+  setText('viewEmployeeCreatedAt',   record.created_at || '-');
+  setText('viewEmployeeUpdatedAt',   record.updated_at || '-');
 
   modal.classList.add('show');
 }
 
 function closeViewEmployeeModal() {
-  const modal = document.getElementById('viewEmployeeModal');
-  if (modal) modal.classList.remove('show');
+  document.getElementById('viewEmployeeModal')?.classList.remove('show');
 }
+
+function openEditEmployeeModal(record) {
+  const modal = document.getElementById('editEmployeeModal');
+  if (!modal) { showToast('Edit modal not found.', 'error'); return; }
+
+  const parts    = parseNameParts(record);
+  const setValue = (id, value) => { const el = document.getElementById(id); if (el) el.value = escapeText(value); };
+
+  setValue('editEmployeeFirstName',  parts.firstName);
+  setValue('editEmployeeMiddleName', parts.middleName);
+  setValue('editEmployeeLastName',   parts.lastName);
+  setValue('editEmployeeNumber',     record.employee_number);
+  setValue('editEmployeeDepartment', record.department);
+  setValue('editEmployeePosition',   record.position);
+  setValue('editEmployeeRfid',       record.rfid_uid !== '-' ? record.rfid_uid : '');
+
+  modal._record = record;
+  modal.classList.add('show');
+}
+
+function closeEditEmployeeModal() {
+  document.getElementById('editEmployeeModal')?.classList.remove('show');
+}
+
+async function saveEditEmployee() {
+  const modal  = document.getElementById('editEmployeeModal');
+  const record = modal?._record;
+
+  if (!record?.id) { showToast('Employee record not found.', 'error'); return; }
+
+  const rfid = document.getElementById('editEmployeeRfid')?.value.trim() || '';
+
+  try {
+    const endpoint = getEndpoint(tableState.table) || '../backend/api/employees.php';
+    await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
+    showToast('Employee RFID updated successfully.', 'success');
+    closeEditEmployeeModal();
+    await reloadTable();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function openAddEmployeeModal() {
+  const modal = document.getElementById('addEmployeeModal');
+  if (!modal) return;
+  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.classList.add('show');
+}
+
+function closeAddEmployeeModal() {
+  document.getElementById('addEmployeeModal')?.classList.remove('show');
+}
+
+async function saveAddEmployee() {
+  const get = (id) => document.getElementById(id)?.value.trim() || '';
+
+  const body = {
+    first_name:      get('addEmployeeFirstName'),
+    middle_name:     get('addEmployeeMiddleName'),
+    last_name:       get('addEmployeeLastName'),
+    employee_number: get('addEmployeeNumber'),
+    department:      get('addEmployeeDepartment'),
+    position:        get('addEmployeePosition'),
+    rfid_uid:        get('addEmployeeRfid'),
+  };
+
+  if (!body.first_name || !body.last_name || !body.employee_number) {
+    showToast('First name, last name, and employee number are required.', 'error');
+    return;
+  }
+
+  try {
+    const endpoint = getEndpoint(tableState.table) || '../backend/api/employees.php';
+    await apiRequest(endpoint, 'POST', body);
+    showToast('Employee added successfully.', 'success');
+    closeAddEmployeeModal();
+    await reloadTable();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+// ── Import ────────────────────────────────────────────────────────────────────
 
 function openImportModal(entity) {
   const modal = document.getElementById('importModal');
@@ -757,23 +966,20 @@ function openImportModal(entity) {
 
   importState.entity = entity;
   const title = document.getElementById('importModalTitle');
-  if (title) {
-    title.textContent = `Upload ${entity === 'students' ? 'Student' : 'Employee'} File`;
-  }
+  if (title) title.textContent = `Upload ${entity === 'students' ? 'Student' : 'Employee'} File`;
 
   modal.classList.add('show');
 }
 
 function closeImportModal() {
-  const modal = document.getElementById('importModal');
-  if (modal) modal.classList.remove('show');
+  document.getElementById('importModal')?.classList.remove('show');
 }
 
-function handleImportFile(file) {
+async function handleImportFile(file) {
   if (!file) return;
 
   const fileName = String(file.name || '').toLowerCase();
-  const maxSize = 25 * 1024 * 1024;
+  const maxSize  = 25 * 1024 * 1024;
 
   if (!fileName.endsWith('.xlsx')) {
     showToast('Import failed: only .xlsx files are allowed.', 'error');
@@ -785,16 +991,52 @@ function handleImportFile(file) {
     return;
   }
 
-  showToast(`Import file accepted for ${importState.entity || 'selected'} records.`, 'success');
-  closeImportModal();
+  const entity   = importState.entity;
+  const endpoint = getEndpoint(tableState.table)
+    || `../backend/api/${entity}.php`;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body: formData,
+    });
+
+    const payload = await response.json();
+
+    if (!response.ok || !payload.success) {
+      throw new Error(payload.message || `Import failed (${response.status})`);
+    }
+
+    const { inserted = 0, skipped = 0, errors = [] } = payload;
+    let message = `Import complete: ${inserted} inserted, ${skipped} skipped.`;
+
+    if (errors.length) {
+      console.warn('Import row errors:', errors);
+      message += ` ${errors.length} row error(s) — check the console for details.`;
+    }
+
+    showToast(message, skipped > 0 ? 'warning' : 'success');
+    closeImportModal();
+    await reloadTable();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
 }
 
 function bindImportControls() {
-  const openBtn = document.getElementById('openImportBtn');
+  const openBtn   = document.getElementById('openImportBtn');
   const fileInput = document.getElementById('importFileInput');
-  const dropzone = document.getElementById('importDropzone');
+  const dropzone  = document.getElementById('importDropzone');
 
-  const entity = tableState.pageType === 'students' ? 'students' : tableState.pageType === 'employees' ? 'employees' : '';
+  const entity = tableState.pageType === 'students'
+    ? 'students'
+    : tableState.pageType === 'employees'
+      ? 'employees'
+      : '';
 
   openBtn?.addEventListener('click', () => {
     if (!entity) return;
@@ -820,277 +1062,25 @@ function bindImportControls() {
     dropzone.addEventListener('drop', (event) => {
       event.preventDefault();
       dropzone.classList.remove('is-dragover');
-      const file = event.dataTransfer?.files?.[0];
-      handleImportFile(file);
+      handleImportFile(event.dataTransfer?.files?.[0]);
     });
   }
 }
 
 function bindAddButtons() {
-  const addStudentBtn = document.getElementById('addStudentBtn');
-  const addEmployeeBtn = document.getElementById('addEmployeeBtn');
-
-  addStudentBtn?.addEventListener('click', () => {
-    showToast('Add Student form will open here.', 'success');
-  });
-
-  addEmployeeBtn?.addEventListener('click', () => {
-    showToast('Add Employee form will open here.', 'success');
-  });
+  document.getElementById('addStudentBtn')?.addEventListener('click', openAddStudentModal);
+  document.getElementById('addEmployeeBtn')?.addEventListener('click', openAddEmployeeModal);
 }
 
-function closeAddUserModal() {
-  const modal = document.getElementById('addUserModal');
-  if (modal) {
-    modal.classList.remove('show');
-  }
-}
-
-// ===== EDIT STUDENT MODAL =====
-function openEditStudentModal(record) {
-  const modal = document.getElementById('editStudentModal');
-  if (!modal) {
-    showToast('Edit modal not found.', 'error');
-    return;
-  }
-
-  const parts = parseNameParts(record);
-  const setValue = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.value = escapeText(value);
-  };
-
-  setValue('editStudentFirstName', parts.firstName);
-  setValue('editStudentMiddleName', parts.middleName);
-  setValue('editStudentLastName', parts.lastName);
-  setValue('editStudentNumber', record.student_number);
-  setValue('editStudentCourse', record.course);
-  setValue('editStudentYearLevel', record.year_level);
-  setValue('editStudentDepartment', record.department);
-  setValue('editStudentRfid', record.rfid_uid);
-
-  modal._record = record;
-  modal.classList.add('show');
-}
-
-function closeEditStudentModal() {
-  const modal = document.getElementById('editStudentModal');
-  if (modal) modal.classList.remove('show');
-}
-
-function saveEditStudent() {
-  const rfid = document.getElementById('editStudentRfid')?.value.trim();
-  if (!rfid) {
-    showToast('RFID UID cannot be empty.', 'error');
-    return;
-  }
-  // TODO: send PATCH/PUT to backend with updated rfid
-  showToast('Student RFID updated successfully.', 'success');
-  closeEditStudentModal();
-}
-
-function openAddStudentModal() {
-  const modal = document.getElementById('addStudentModal');
-  if (!modal) return;
-  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
-  modal.classList.add('show');
-}
-
-function closeAddStudentModal() {
-  const modal = document.getElementById('addStudentModal');
-  if (modal) modal.classList.remove('show');
-}
-
-function saveAddStudent() {
-  const get = (id) => document.getElementById(id)?.value.trim() || '';
-  const firstName = get('addStudentFirstName');
-  const lastName = get('addStudentLastName');
-  const studentNumber = get('addStudentNumber');
-
-  if (!firstName || !lastName || !studentNumber) {
-    showToast('First name, last name, and student number are required.', 'error');
-    return;
-  }
-  // TODO: send POST to backend
-  showToast('Student added successfully.', 'success');
-  closeAddStudentModal();
-}
-
-// ===== EDIT EMPLOYEE MODAL =====
-function openEditEmployeeModal(record) {
-  const modal = document.getElementById('editEmployeeModal');
-  if (!modal) {
-    showToast('Edit modal not found.', 'error');
-    return;
-  }
-
-  const parts = parseNameParts(record);
-  const setValue = (id, value) => {
-    const el = document.getElementById(id);
-    if (el) el.value = escapeText(value);
-  };
-
-  setValue('editEmployeeFirstName', parts.firstName);
-  setValue('editEmployeeMiddleName', parts.middleName);
-  setValue('editEmployeeLastName', parts.lastName);
-  setValue('editEmployeeNumber', record.employee_number);
-  setValue('editEmployeeDepartment', record.department);
-  setValue('editEmployeePosition', record.position);
-  setValue('editEmployeeRfid', record.rfid_uid);
-
-  modal._record = record;
-  modal.classList.add('show');
-}
-
-function closeEditEmployeeModal() {
-  const modal = document.getElementById('editEmployeeModal');
-  if (modal) modal.classList.remove('show');
-}
-
-function saveEditEmployee() {
-  const rfid = document.getElementById('editEmployeeRfid')?.value.trim();
-  if (!rfid) {
-    showToast('RFID UID cannot be empty.', 'error');
-    return;
-  }
-  // TODO: send PATCH/PUT to backend with updated rfid
-  showToast('Employee RFID updated successfully.', 'success');
-  closeEditEmployeeModal();
-}
-
-function openAddEmployeeModal() {
-  const modal = document.getElementById('addEmployeeModal');
-  if (!modal) return;
-  modal.querySelectorAll('input').forEach((el) => (el.value = ''));
-  modal.classList.add('show');
-}
-
-function closeAddEmployeeModal() {
-  const modal = document.getElementById('addEmployeeModal');
-  if (modal) modal.classList.remove('show');
-}
-
-function saveAddEmployee() {
-  const get = (id) => document.getElementById(id)?.value.trim() || '';
-  const firstName = get('addEmployeeFirstName');
-  const lastName = get('addEmployeeLastName');
-  const employeeNumber = get('addEmployeeNumber');
-
-  if (!firstName || !lastName || !employeeNumber) {
-    showToast('First name, last name, and employee number are required.', 'error');
-    return;
-  }
-  // TODO: send POST to backend
-  showToast('Employee added successfully.', 'success');
-  closeAddEmployeeModal();
-}
-
-// ===== BIND ADD BUTTONS =====
-function bindAddButtons() {
-  const addStudentBtn = document.getElementById('addStudentBtn');
-  const addEmployeeBtn = document.getElementById('addEmployeeBtn');
-
-  addStudentBtn?.addEventListener('click', openAddStudentModal);
-  addEmployeeBtn?.addEventListener('click', openAddEmployeeModal);
-}
-
-// ===== POPULATE FILTER SELECTS =====
-function populateYearLevelSelect(rows) {
-  const select = document.getElementById('yearLevelSelect');
-  if (!select) return;
-
-  const existingValue = select.value || 'all';
-  const yearLevels = [...new Set(rows.map((row) => row.year_level).filter(Boolean))].sort();
-
-  select.innerHTML = '<option value="all">All Year Levels</option>';
-  yearLevels.forEach((yearLevel) => {
-    const option = document.createElement('option');
-    option.value = yearLevel;
-    option.textContent = yearLevel;
-    select.appendChild(option);
-  });
-
-  if ([...select.options].some((option) => option.value === existingValue)) {
-    select.value = existingValue;
-  }
-}
-
-function populateCourseSelect(rows) {
-  const select = document.getElementById('courseSelect');
-  if (!select) return;
-
-  const existingValue = select.value || 'all';
-  const courses = [...new Set(rows.map((row) => row.course).filter(Boolean))].sort();
-
-  select.innerHTML = '<option value="all">All Courses</option>';
-  courses.forEach((course) => {
-    const option = document.createElement('option');
-    option.value = course;
-    option.textContent = course;
-    select.appendChild(option);
-  });
-
-  if ([...select.options].some((option) => option.value === existingValue)) {
-    select.value = existingValue;
-  }
-}
-
-function populatePositionSelect(rows) {
-  const select = document.getElementById('positionSelect');
-  if (!select) return;
-
-  const existingValue = select.value || 'all';
-  const positions = [...new Set(rows.map((row) => row.position).filter(Boolean))].sort();
-
-  select.innerHTML = '<option value="all">All Positions</option>';
-  positions.forEach((position) => {
-    const option = document.createElement('option');
-    option.value = position;
-    option.textContent = position;
-    select.appendChild(option);
-  });
-
-  if ([...select.options].some((option) => option.value === existingValue)) {
-    select.value = existingValue;
-  }
-}
-
-// ===== BIND ADDITIONAL FILTER CONTROLS =====
-function bindAdditionalFilterControls() {
-  const yearLevelSelect = document.getElementById('yearLevelSelect');
-  const courseSelect = document.getElementById('courseSelect');
-  const positionSelect = document.getElementById('positionSelect');
-
-  yearLevelSelect?.addEventListener('change', () => {
-    tableState.currentPage = 1;
-    applyFilters();
-  });
-  
-  courseSelect?.addEventListener('change', () => {
-    tableState.currentPage = 1;
-    applyFilters();
-  });
-  
-  positionSelect?.addEventListener('change', () => {
-    tableState.currentPage = 1;
-    applyFilters();
-  });
-}
+// ── Boot ──────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const sidebar = document.querySelector('.sidebar');
-  if (sidebar) {
-    const collapsed = localStorage.getItem('sidebar-collapsed');
-    if (collapsed === '1') {
-      sidebar.classList.add('collapsed');
-    }
-    document.documentElement.classList.toggle('sidebar-collapsed', collapsed === '1');
-  }
+  const sidebar   = document.querySelector('.sidebar');
+  const collapsed = localStorage.getItem('sidebar-collapsed');
+  if (sidebar) sidebar.classList.toggle('collapsed', collapsed === '1');
+  document.documentElement.classList.toggle('sidebar-collapsed', collapsed === '1');
 
-  const loginForm = document.getElementById('loginForm');
-  if (loginForm) {
-    loginForm.addEventListener('submit', handleLogin);
-  }
+  document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
 
   initLoadingSkeletons();
 
@@ -1101,9 +1091,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const currentPage = window.location.pathname.split('/').pop();
   document.querySelectorAll('.sidebar-nav a').forEach((link) => {
     const href = link.getAttribute('href');
-    if (href === currentPage) {
-      link.classList.add('active');
-    }
+    if (href === currentPage) link.classList.add('active');
 
     link.addEventListener('click', (event) => {
       if (href !== currentPage) {

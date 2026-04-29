@@ -70,6 +70,8 @@ CREATE TABLE `employees` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+ALTER TABLE `employees` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
+
 --
 -- Dumping data for table `employees`
 --
@@ -116,6 +118,8 @@ CREATE TABLE `students` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+ALTER TABLE `students` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
+
 --
 -- Dumping data for table `students`
 --
@@ -144,6 +148,9 @@ CREATE TABLE `users` (
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE users ADD COLUMN employee_id INT NULL AFTER id;
+ALTER TABLE users ADD CONSTRAINT fk_users_employee FOREIGN KEY (employee_id) REFERENCES employees(id);
 
 --
 -- Dumping data for table `users`

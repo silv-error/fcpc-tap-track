@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Debug - Endpoint Tester</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #f5f5f5; }
+    .test { background: white; margin: 10px 0; padding: 10px; border: 1px solid #ccc; }
+    .success { color: green; }
+    .error { color: red; }
+    pre { background: #eee; padding: 10px; overflow-x: auto; }
+  </style>
+</head>
+<body>
+<h1>Endpoint Diagnostics</h1>
+
+<div class="test">
+  <h2>Students Endpoint</h2>
+  <button onclick="testEndpoint('../backend/api/students.php', 'students-result')">Test</button>
+  <pre id="students-result">Waiting...</pre>
+</div>
+
+<div class="test">
+  <h2>Employees Endpoint</h2>
+  <button onclick="testEndpoint('../backend/api/employees.php', 'employees-result')">Test</button>
+  <pre id="employees-result">Waiting...</pre>
+</div>
+
+<div class="test">
+  <h2>Users Endpoint</h2>
+  <button onclick="testEndpoint('../backend/api/users.php', 'users-result')">Test</button>
+  <pre id="users-result">Waiting...</pre>
+</div>
+
+<div class="test">
+  <h2>Attendance Endpoint</h2>
+  <button onclick="testEndpoint('../backend/api/attendance.php', 'attendance-result')">Test</button>
+  <pre id="attendance-result">Waiting...</pre>
+</div>
+
+<script>
+async function testEndpoint(endpoint, resultId) {
+  const resultEl = document.getElementById(resultId);
+  try {
+    resultEl.textContent = 'Fetching from: ' + endpoint + '\n...';
+    const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+    const text = await response.text();
+    
+    let output = `Status: ${response.status}\n`;
+    output += `Headers:\n`;
+    response.headers.forEach((value, key) => {
+      output += `  ${key}: ${value}\n`;
+    });
+    output += `\nBody:\n`;
+    
+    try {
+      const json = JSON.parse(text);
+      output += JSON.stringify(json, null, 2);
+      resultEl.className = 'success';
+    } catch (e) {
+      output += text.substring(0, 500);
+      resultEl.className = 'error';
+    }
+    
+    resultEl.textContent = output;
+  } catch (error) {
+    resultEl.className = 'error';
+    resultEl.textContent = 'Fetch Error: ' + error.message + '\n\nStack: ' + error.stack;
+  }
+}
+</script>
+
+</body>
+</html>
