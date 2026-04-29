@@ -142,7 +142,7 @@ function buildRowModel(pageType, record) {
     case 'users':
       return {
         cells: [
-          escapeText(record.id),
+          escapeText(record.employee_number),
           escapeText(record.username),
           escapeText(record.name),
           escapeText(record.email),
@@ -151,7 +151,7 @@ function buildRowModel(pageType, record) {
           escapeText(record.created_at),
           escapeText(record.updated_at),
         ],
-        searchText: [record.id, record.username, record.name, record.email, record.role, record.status].join(' ').toLowerCase(),
+        searchText: [record.employee_number, record.username, record.name, record.email, record.role, record.status].join(' ').toLowerCase(),
         department: '',
         typeValue: escapeText(record.role),
         dateValue: normalizeDate(record.created_at),
@@ -662,12 +662,27 @@ function openAddUserModal() {
   const statusSelect = document.getElementById('status');
   if (roleSelect) roleSelect.value = '';
   if (statusSelect) statusSelect.value = 'Active';
+  resetAddUserPasswordField();
   modal.classList.add('show');
 }
 
 function closeAddUserModal() {
   const modal = document.getElementById('addUserModal');
   if (modal) modal.classList.remove('show');
+  resetAddUserPasswordField();
+}
+
+function resetAddUserPasswordField() {
+  const passwordInput = document.getElementById('password');
+  const toggleButton = document.getElementById('passwordToggleBtn');
+  const eyeShowIcon = toggleButton?.querySelector('.eye-icon-show');
+  const eyeHideIcon = toggleButton?.querySelector('.eye-icon-hide');
+
+  if (!passwordInput || !eyeShowIcon || !eyeHideIcon) return;
+
+  passwordInput.type = 'password';
+  eyeShowIcon.style.display = 'block';
+  eyeHideIcon.style.display = 'none';
 }
 
 function saveAddUser() {
@@ -676,15 +691,35 @@ function saveAddUser() {
   const firstName = get('first_name');
   const lastName = get('last_name');
   const email = get('email');
+  const password = get('password');
   const role = get('role');
 
-  if (!username || !firstName || !lastName || !email || !role) {
+  if (!username || !firstName || !lastName || !email || !password || !role) {
     showToast('Please fill in all required fields.', 'error');
     return;
   }
   // TODO: send POST to backend
   showToast('User added successfully.', 'success');
   closeAddUserModal();
+}
+
+function togglePasswordVisibility() {
+  const passwordInput = document.getElementById('password');
+  const toggleButton = document.getElementById('passwordToggleBtn');
+  const eyeShowIcon = toggleButton?.querySelector('.eye-icon-show');
+  const eyeHideIcon = toggleButton?.querySelector('.eye-icon-hide');
+
+  if (!passwordInput || !eyeShowIcon || !eyeHideIcon) return;
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    eyeShowIcon.style.display = 'none';
+    eyeHideIcon.style.display = 'block';
+  } else {
+    passwordInput.type = 'password';
+    eyeShowIcon.style.display = 'block';
+    eyeHideIcon.style.display = 'none';
+  }
 }
 
 // ===== VIEW USER MODAL =====
@@ -710,6 +745,7 @@ function openViewUserModal(record) {
   setValue('viewUserEmail', record.email);
   setValue('viewUserRole', record.role);
   setValue('viewUserStatus', record.status);
+  setValue('viewUserEmployeeNo', record.employee_number);
   setText('viewUserCreatedAt', record.created_at || '-');
   setText('viewUserUpdatedAt', record.updated_at || '-');
 
@@ -740,6 +776,7 @@ function openEditUserModal(record) {
   setValue('editUserMiddleName', parts.middleName);
   setValue('editUserLastName', parts.lastName);
   setValue('editUserEmail', record.email);
+  setValue('editUserEmployeeNo', record.employee_number);
   
   const roleSelect = document.getElementById('editUserRole');
   if (roleSelect) roleSelect.value = record.role || '';
