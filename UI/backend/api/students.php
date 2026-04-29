@@ -29,6 +29,9 @@ $data = array_map(static function (array $student): array {
         'id' => (int) $student['id'],
         'student_number' => $student['student_number'],
         'rfid_uid' => $student['rfid_uid'],
+        'last_name' => $student['last_name'],
+        'first_name' => $student['first_name'],
+        'middle_name' => $student['middle_name'],
         'name' => format_display_name(
             $student['last_name'],
             $student['first_name'],
