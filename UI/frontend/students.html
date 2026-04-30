@@ -119,8 +119,23 @@
           </div>
         </div>
         <div class="table-toolbar-actions">
-          <button id="addStudentBtn" class="toolbar-btn toolbar-btn-primary">+ Add Student</button>
-          <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary">Import</button>
+          <button id="addStudentBtn" class="toolbar-btn toolbar-btn-primary" type="button">+ Add Student</button>
+          <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3v10"/>
+              <path d="M8.5 9.5 12 13l3.5-3.5"/>
+              <path d="M5 15.5V19h14v-3.5"/>
+            </svg>
+            <span>Import</span>
+          </button>
+          <button id="openExportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21V11"/>
+              <path d="m8.5 14.5 3.5-3.5 3.5 3.5"/>
+              <path d="M5 8.5V5h14v3.5"/>
+            </svg>
+            <span>Export</span>
+          </button>
         </div>
       </div>
 
@@ -245,6 +260,18 @@
   </div>
 </div>
 
+<div id="exportModal" class="modal">
+  <div class="modal-overlay" onclick="closeExportModal()"></div>
+  <div class="modal-content overview-modal-content export-modal-content">
+    <div id="exportModalTitle" class="overview-header">Export Student Records</div>
+    <div id="exportModalBody" class="export-modal-body"></div>
+    <div class="export-modal-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeExportModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="handleExport()">Export</button>
+    </div>
+  </div>
+</div>
+
 <!-- Edit Student Modal -->
 <div id="editStudentModal" class="modal">
   <div class="modal-overlay" onclick="closeEditStudentModal()"></div>
@@ -299,7 +326,7 @@
     <div class="overview-header">Add Student</div>
     <div class="overview-grid">
       <div class="overview-field">
-        <label for="addStudentFirstName">First Name:</label>
+        <label for="addStudentFirstName">First Name:<span class="field-required">*</span></label>
         <input id="addStudentFirstName" type="text" class="edit-input-active" placeholder="First name" />
       </div>
       <div class="overview-field">
@@ -307,19 +334,23 @@
         <input id="addStudentMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
       </div>
       <div class="overview-field">
-        <label for="addStudentLastName">Last Name:</label>
+        <label for="addStudentSuffix">Suffix:</label>
+        <input id="addStudentSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentLastName">Last Name:<span class="field-required">*</span></label>
         <input id="addStudentLastName" type="text" class="edit-input-active" placeholder="Last name" />
       </div>
       <div class="overview-field">
-        <label for="addStudentNumber">Student No.:</label>
+        <label for="addStudentNumber">Student No.:<span class="field-required">*</span></label>
         <input id="addStudentNumber" type="text" class="edit-input-active" placeholder="Student No." />
       </div>
       <div class="overview-field">
-        <label for="addStudentCourse">Course:</label>
+        <label for="addStudentCourse">Course:<span class="field-required">*</span></label>
         <input id="addStudentCourse" type="text" class="edit-input-active" placeholder="e.g. BSIT" />
       </div>
       <div class="overview-field">
-        <label for="addStudentYearLevel">Year Level:</label>
+        <label for="addStudentYearLevel">Year Level:<span class="field-required">*</span></label>
         <select id="addStudentYearLevel" class="edit-input-active overview-select">
             <option value="">Select Year Level</option>
             <option value="1st Year">1st Year</option>
@@ -329,7 +360,7 @@
           </select>
       </div>
       <div class="overview-field overview-field-full">
-        <label for="addStudentDepartment">Department:</label>
+        <label for="addStudentDepartment">Department:<span class="field-required">*</span></label>
         <input id="addStudentDepartment" type="text" class="edit-input-active" placeholder="Department" />
       </div>
       <div class="overview-field overview-field-full">
@@ -347,6 +378,7 @@
 
 <div id="appToast" class="app-toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/script.js"></script>
 </body>
 </html>

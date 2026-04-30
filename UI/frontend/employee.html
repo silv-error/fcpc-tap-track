@@ -114,8 +114,23 @@
           </div>
         </div>
         <div class="table-toolbar-actions">
-          <button id="addEmployeeBtn" class="toolbar-btn toolbar-btn-primary">+ Add Employee</button>
-          <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary">Import</button>
+          <button id="addEmployeeBtn" class="toolbar-btn toolbar-btn-primary" type="button">+ Add Employee</button>
+          <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 3v10"/>
+              <path d="M8.5 9.5 12 13l3.5-3.5"/>
+              <path d="M5 15.5V19h14v-3.5"/>
+            </svg>
+            <span>Import</span>
+          </button>
+          <button id="openExportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21V11"/>
+              <path d="m8.5 14.5 3.5-3.5 3.5 3.5"/>
+              <path d="M5 8.5V5h14v3.5"/>
+            </svg>
+            <span>Export</span>
+          </button>
         </div>
       </div>
 
@@ -235,6 +250,18 @@
   </div>
 </div>
 
+<div id="exportModal" class="modal">
+  <div class="modal-overlay" onclick="closeExportModal()"></div>
+  <div class="modal-content overview-modal-content export-modal-content">
+    <div id="exportModalTitle" class="overview-header">Export Employee Records</div>
+    <div id="exportModalBody" class="export-modal-body"></div>
+    <div class="export-modal-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeExportModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="handleExport()">Export</button>
+    </div>
+  </div>
+</div>
+
 <!-- Edit Employee Modal -->
 <div id="editEmployeeModal" class="modal">
   <div class="modal-overlay" onclick="closeEditEmployeeModal()"></div>
@@ -285,7 +312,7 @@
     <div class="overview-header">Add Employee</div>
     <div class="overview-grid">
       <div class="overview-field">
-        <label for="addEmployeeFirstName">First Name:</label>
+        <label for="addEmployeeFirstName">First Name:<span class="field-required">*</span></label>
         <input id="addEmployeeFirstName" type="text" class="edit-input-active" placeholder="First name" />
       </div>
       <div class="overview-field">
@@ -293,19 +320,23 @@
         <input id="addEmployeeMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeLastName">Last Name:</label>
+        <label for="addEmployeeSuffix">Suffix:</label>
+        <input id="addEmployeeSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
+      </div>
+      <div class="overview-field">
+        <label for="addEmployeeLastName">Last Name:<span class="field-required">*</span></label>
         <input id="addEmployeeLastName" type="text" class="edit-input-active" placeholder="Last name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeNumber">Employee No.:</label>
+        <label for="addEmployeeNumber">Employee No.:<span class="field-required">*</span></label>
         <input id="addEmployeeNumber" type="text" class="edit-input-active" placeholder="e.g. EMP-00001" />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="addEmployeeDepartment">Department:</label>
+        <label for="addEmployeeDepartment">Department:<span class="field-required">*</span></label>
         <input id="addEmployeeDepartment" type="text" class="edit-input-active" placeholder="Department" />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="addEmployeePosition">Designation/Position:</label>
+        <label for="addEmployeePosition">Designation/Position:<span class="field-required">*</span></label>
         <input id="addEmployeePosition" type="text" class="edit-input-active" placeholder="e.g. Instructor" />
       </div>
       <div class="overview-field overview-field-full">
@@ -323,6 +354,7 @@
 
 <div id="appToast" class="app-toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/script.js"></script>
 </body>
 </html>

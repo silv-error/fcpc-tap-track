@@ -1,0 +1,5 @@
+<br />
+<b>Fatal error</b>:  Uncaught Error: Class &quot;PhpOffice\PhpSpreadsheet\Spreadsheet&quot; not found in C:\xampp\htdocs\fcpc-tap-track\UI\backend\api\export.php:161
+Stack trace:
+#0 {main}
+  thrown in <b>C:\xampp\htdocs\fcpc-tap-track\UI\backend\api\export.php</b> on line <b>161</b><br />

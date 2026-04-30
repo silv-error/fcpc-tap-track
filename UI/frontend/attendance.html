@@ -96,8 +96,9 @@
       <h1 class="page-title">Attendance</h1>
       <hr class="page-divider" />
 
-      <!-- Filters -->
-      <div class="filters-row">
+      <div class="table-toolbar">
+        <!-- Filters -->
+        <div class="filters-row table-toolbar-filters">
         <div class="filter-group">
           <label for="searchInput">Search</label>
           <input
@@ -126,6 +127,18 @@
             placeholder="MM/DD/YYYY"
           />
         </div>
+        </div>
+
+        <div class="table-toolbar-actions">
+          <button id="openExportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21V11"/>
+              <path d="m8.5 14.5 3.5-3.5 3.5 3.5"/>
+              <path d="M5 8.5V5h14v3.5"/>
+            </svg>
+            <span>Export</span>
+          </button>
+        </div>
       </div>
 
       <!-- Table -->
@@ -138,8 +151,6 @@
               <th>Name</th>
               <th>Time In</th>
               <th>Time Out</th>
-              <th>Created At</th>
-              <th>Updated At</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -174,6 +185,21 @@
   </div>
 </div>
 
+<div id="exportModal" class="modal">
+  <div class="modal-overlay" onclick="closeExportModal()"></div>
+  <div class="modal-content overview-modal-content export-modal-content">
+    <div id="exportModalTitle" class="overview-header">Export Attendance Records</div>
+    <div id="exportModalBody" class="export-modal-body"></div>
+    <div class="export-modal-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeExportModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="handleExport()">Export</button>
+    </div>
+  </div>
+</div>
+
+<div id="appToast" class="app-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/script.js"></script>
 </body>
 </html>

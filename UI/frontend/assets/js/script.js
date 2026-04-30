@@ -12,6 +12,10 @@ const importState = {
   entity: '',
 };
 
+const exportState = {
+  entity: '',
+};
+
 function escapeText(value) {
   return value === null || value === undefined || value === '' ? '-' : String(value);
 }
@@ -87,6 +91,53 @@ function getEndpoint(table) {
   return table?.dataset?.endpoint || '';
 }
 
+const USER_OVERRIDES_STORAGE_KEY = 'fcpc-users-ui-overrides';
+
+function getUserRecordKey(record) {
+  const candidates = [record?.id, record?.employee_id, record?.employee_number, record?.username, record?.email];
+  const key = candidates.find((value) => value !== null && value !== undefined && String(value).trim() !== '' && String(value).trim() !== '-');
+  return String(key ?? '');
+}
+
+function readUserOverrides() {
+  try {
+    const raw = localStorage.getItem(USER_OVERRIDES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (error) {
+    console.warn('Unable to read user overrides:', error);
+    return {};
+  }
+}
+
+function writeUserOverrides(overrides) {
+  try {
+    localStorage.setItem(USER_OVERRIDES_STORAGE_KEY, JSON.stringify(overrides));
+  } catch (error) {
+    console.warn('Unable to persist user overrides:', error);
+  }
+}
+
+function mergeUserOverrides(rows) {
+  const overrides = readUserOverrides();
+
+  return rows.map((record) => {
+    const key = getUserRecordKey(record);
+    if (!key || !overrides[key]) return record;
+    return { ...record, ...overrides[key] };
+  });
+}
+
+function saveUserOverride(record, updates) {
+  const key = getUserRecordKey(record);
+  if (!key) return record;
+
+  const overrides = readUserOverrides();
+  overrides[key] = { ...(overrides[key] || {}), ...updates };
+  writeUserOverrides(overrides);
+
+  return { ...record, ...overrides[key] };
+}
+
 function buildRowModel(pageType, record) {
   switch (pageType) {
     case 'students':
@@ -131,8 +182,6 @@ function buildRowModel(pageType, record) {
           escapeText(record.name),
           formatTime(record.time_in),
           formatTime(record.time_out),
-          escapeText(record.created_at),
-          escapeText(record.updated_at),
         ],
         searchText: [record.reference_number, record.name, record.department, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
         department: escapeText(record.department),
@@ -142,16 +191,14 @@ function buildRowModel(pageType, record) {
     case 'users':
       return {
         cells: [
-          escapeText(record.employee_number),   // ← was record.id
+          escapeText(record.employee_number),
           escapeText(record.username),
           escapeText(record.name),
           escapeText(record.email),
           escapeText(record.role),
           record.is_active ? 'Active' : 'Inactive',
-          escapeText(record.created_at),
-          escapeText(record.updated_at),
         ],
-        searchText: [record.employee_number, record.username, record.name, record.email, record.role].join(' ').toLowerCase(),
+        searchText: [record.employee_number, record.username, record.name, record.email, record.role, record.is_active ? 'Active' : 'Inactive'].join(' ').toLowerCase(),
         department: '',
         typeValue: escapeText(record.role),
         dateValue: normalizeDate(record.created_at),
@@ -285,7 +332,7 @@ function renderCurrentPage() {
       row.appendChild(cell);
     });
 
-    if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
+    if (tableState.pageType === 'students' || tableState.pageType === 'employees' || tableState.pageType === 'users') {
       const actionCell = document.createElement('td');
       const actionWrap = document.createElement('div');
       actionWrap.className = 'row-actions';
@@ -297,8 +344,10 @@ function renderCurrentPage() {
         event.preventDefault();
         if (tableState.pageType === 'students') {
           openViewStudentModal(record);
-        } else {
+        } else if (tableState.pageType === 'employees') {
           openViewEmployeeModal(record);
+        } else {
+          openViewUserModal(record);
         }
       };
 
@@ -309,8 +358,10 @@ function renderCurrentPage() {
         event.preventDefault();
         if (tableState.pageType === 'students') {
           openEditStudentModal(record);
-        } else {
+        } else if (tableState.pageType === 'employees') {
           openEditEmployeeModal(record);
+        } else {
+          openEditUserModal(record);
         }
       };
 
@@ -493,8 +544,12 @@ async function loadTableData() {
     const payload = await response.json();
     const rows    = Array.isArray(payload.data) ? payload.data : [];
 
-    tableState.rows         = rows;
-    tableState.filteredRows = rows.slice();
+    if (tableState.pageType === 'users') {
+      tableState.rows = mergeUserOverrides(rows);
+    } else {
+      tableState.rows = rows;
+    }
+    tableState.filteredRows = tableState.rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
       populateDepartmentSelect(rows);
@@ -664,6 +719,403 @@ function openDatePicker() {
   if (input) input.showPicker ? input.showPicker() : input.click();
 }
 
+// ── Export ───────────────────────────────────────────────────────────────────
+
+function getExportPageLabel(pageType) {
+  if (pageType === 'students') return 'Student';
+  if (pageType === 'employees') return 'Employee';
+  if (pageType === 'attendance') return 'Attendance';
+  return 'Record';
+}
+
+function getUniqueFieldValues(rows, field) {
+  return [...new Set(rows.map((row) => escapeText(row?.[field])).filter((value) => value && value !== '-'))].sort((a, b) => a.localeCompare(b));
+}
+
+function getExportHeadersAndRows(pageType, rows) {
+  switch (pageType) {
+    case 'students':
+      return {
+        headers: ['Student No.', 'RFID UID', 'Name', 'Course', 'Year Level', 'Department'],
+        rows: rows.map((record) => [
+          escapeText(record.student_number),
+          escapeText(record.rfid_uid),
+          escapeText(record.name),
+          escapeText(record.course),
+          escapeText(record.year_level),
+          escapeText(record.department),
+        ]),
+      };
+    case 'employees':
+      return {
+        headers: ['Employee No.', 'RFID UID', 'Name', 'Position', 'Department'],
+        rows: rows.map((record) => [
+          escapeText(record.employee_number),
+          escapeText(record.rfid_uid),
+          escapeText(record.name),
+          escapeText(record.position),
+          escapeText(record.department),
+        ]),
+      };
+    case 'attendance':
+      return {
+        headers: ['Date', 'ID', 'Name', 'Time In', 'Time Out'],
+        rows: rows.map((record) => [
+          escapeText(record.log_date),
+          escapeText(record.reference_number),
+          escapeText(record.name),
+          escapeText(record.time_in),
+          escapeText(record.time_out),
+        ]),
+      };
+    default:
+      return { headers: [], rows: [] };
+  }
+}
+
+function getExportSortValue(pageType, record, sortKey) {
+  const parts = parseNameParts(record);
+
+  switch (pageType) {
+    case 'students':
+      if (sortKey === 'student_number') return escapeText(record.student_number);
+      if (sortKey === 'department') return escapeText(record.department);
+      if (sortKey === 'course') return escapeText(record.course);
+      if (sortKey === 'year_level') return escapeText(record.year_level);
+      return parts.lastName;
+    case 'employees':
+      if (sortKey === 'employee_number') return escapeText(record.employee_number);
+      if (sortKey === 'department') return escapeText(record.department);
+      if (sortKey === 'position') return escapeText(record.position);
+      return parts.lastName;
+    case 'attendance':
+      if (sortKey === 'reference_number') return escapeText(record.reference_number);
+      if (sortKey === 'type') return escapeText(record.record_type);
+      if (sortKey === 'name') return escapeText(record.name);
+      return escapeText(record.log_date);
+    default:
+      return '';
+  }
+}
+
+function getExportModalBody(pageType, rows) {
+  const optionsFromRows = (field, allLabel) => {
+    const uniqueValues = getUniqueFieldValues(rows, field);
+    const options = [`<option value="all">${allLabel}</option>`];
+
+    uniqueValues.forEach((value) => {
+      options.push(`<option value="${value.replace(/"/g, '&quot;')}">${value}</option>`);
+    });
+
+    return options.join('');
+  };
+
+  if (pageType === 'students') {
+    return `
+      <div class="export-body-grid">
+        <div class="export-field export-field-full">
+          <label for="exportSearchInput">Search</label>
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" />
+        </div>
+
+        <div class="export-section-label export-field-full">Filter</div>
+
+        <div class="export-field">
+          <label for="exportDepartmentSelect">Department</label>
+          <select id="exportDepartmentSelect" class="export-control export-select">
+            ${optionsFromRows('department', 'All Departments')}
+          </select>
+        </div>
+
+        <div class="export-field">
+          <label for="exportCourseSelect">Course</label>
+          <select id="exportCourseSelect" class="export-control export-select">
+            ${optionsFromRows('course', 'All Courses')}
+          </select>
+        </div>
+
+        <div class="export-field export-field-full">
+          <label>Year Level</label>
+          <div class="export-checkbox-row">
+            ${['1st Year', '2nd Year', '3rd Year', '4th Year'].map((level) => `
+              <label class="export-checkbox">
+                <input type="checkbox" name="exportYearLevel" value="${level}" />
+                <span>${level}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="export-section-label export-field-full">Sort By</div>
+
+        <div class="export-field">
+          <label for="exportPrimarySort">Primary Sort</label>
+          <select id="exportPrimarySort" class="export-control export-select">
+            <option value="last_name">Last Name (A-Z)</option>
+            <option value="student_number">Student No. (A-Z)</option>
+            <option value="department">Department (A-Z)</option>
+            <option value="course">Course (A-Z)</option>
+            <option value="year_level">Year Level (A-Z)</option>
+          </select>
+        </div>
+
+        <div class="export-field">
+          <label for="exportSortOrder">Order</label>
+          <select id="exportSortOrder" class="export-control export-select">
+            <option value="asc">Ascending (A-Z)</option>
+            <option value="desc">Descending (Z-A)</option>
+          </select>
+        </div>
+      </div>
+    `;
+  }
+
+  if (pageType === 'employees') {
+    return `
+      <div class="export-body-grid">
+        <div class="export-field export-field-full">
+          <label for="exportSearchInput">Search</label>
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Employee Number" />
+        </div>
+
+        <div class="export-section-label export-field-full">Filter</div>
+
+        <div class="export-field">
+          <label for="exportDepartmentSelect">Department</label>
+          <select id="exportDepartmentSelect" class="export-control export-select">
+            ${optionsFromRows('department', 'All Departments')}
+          </select>
+        </div>
+
+        <div class="export-field">
+          <label for="exportPositionSelect">Position</label>
+          <select id="exportPositionSelect" class="export-control export-select">
+            ${optionsFromRows('position', 'All Positions')}
+          </select>
+        </div>
+
+        <div class="export-section-label export-field-full">Sort By</div>
+
+        <div class="export-field">
+          <label for="exportPrimarySort">Primary Sort</label>
+          <select id="exportPrimarySort" class="export-control export-select">
+            <option value="last_name">Last Name (A-Z)</option>
+            <option value="employee_number">Employee No. (A-Z)</option>
+            <option value="department">Department (A-Z)</option>
+            <option value="position">Position (A-Z)</option>
+          </select>
+        </div>
+
+        <div class="export-field">
+          <label for="exportSortOrder">Order</label>
+          <select id="exportSortOrder" class="export-control export-select">
+            <option value="asc">Ascending (A-Z)</option>
+            <option value="desc">Descending (Z-A)</option>
+          </select>
+        </div>
+      </div>
+    `;
+  }
+
+  if (pageType === 'attendance') {
+    return `
+      <div class="export-body-grid">
+        <div class="export-field export-field-full">
+          <label for="exportSearchInput">Search</label>
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or ID Number" />
+        </div>
+
+        <div class="export-section-label export-field-full">Filter By (Date Range)</div>
+
+        <div class="export-field">
+          <label for="exportDateFrom">From</label>
+          <input id="exportDateFrom" type="date" class="export-control" />
+        </div>
+
+        <div class="export-field">
+          <label for="exportDateTo">To</label>
+          <input id="exportDateTo" type="date" class="export-control" />
+        </div>
+
+        <div class="export-field export-field-full">
+          <label>User Type</label>
+          <div class="export-checkbox-row">
+            ${['All', 'Student', 'Employee'].map((value) => `
+              <label class="export-checkbox">
+                <input type="checkbox" name="exportUserType" value="${value}" />
+                <span>${value}</span>
+              </label>
+            `).join('')}
+          </div>
+        </div>
+
+        <div class="export-section-label export-field-full">Sort By</div>
+
+        <div class="export-field">
+          <label for="exportPrimarySort">Primary Sort</label>
+          <select id="exportPrimarySort" class="export-control export-select">
+            <option value="log_date">Date</option>
+            <option value="reference_number">ID Number</option>
+            <option value="name">Name</option>
+            <option value="type">Type</option>
+          </select>
+        </div>
+
+        <div class="export-field">
+          <label for="exportSortOrder">Order</label>
+          <select id="exportSortOrder" class="export-control export-select">
+            <option value="desc">Descending (New)</option>
+            <option value="asc">Ascending (Old)</option>
+          </select>
+        </div>
+      </div>
+    `;
+  }
+
+  return '';
+}
+
+function openExportModal() {
+  const modal = document.getElementById('exportModal');
+  const title = document.getElementById('exportModalTitle');
+  const body = document.getElementById('exportModalBody');
+  if (!modal || !title || !body) return;
+
+  const pageType = tableState.pageType;
+  if (!pageType || pageType === 'generic') {
+    showToast('Export is not available on this page.', 'error');
+    return;
+  }
+
+  exportState.entity = pageType;
+  const rows = Array.isArray(tableState.rows) ? tableState.rows : [];
+
+  title.textContent = `Export ${getExportPageLabel(pageType)} Records`;
+  body.innerHTML = getExportModalBody(pageType, rows);
+  modal.classList.add('show');
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal')?.classList.remove('show');
+}
+
+function collectExportRows(pageType) {
+  const rows = Array.isArray(tableState.rows) ? tableState.rows.slice() : [];
+  const searchVal = (document.getElementById('exportSearchInput')?.value || '').trim().toLowerCase();
+  const primarySort = document.getElementById('exportPrimarySort')?.value || 'last_name';
+  const sortOrder = document.getElementById('exportSortOrder')?.value || 'asc';
+
+  const filteredRows = rows.filter((record) => {
+    const model = buildRowModel(pageType, record);
+
+    if (searchVal && !model.searchText.includes(searchVal)) {
+      return false;
+    }
+
+    if (pageType === 'students') {
+      const departmentVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
+      const courseVal = (document.getElementById('exportCourseSelect')?.value || 'all').toLowerCase();
+      const yearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value.toLowerCase());
+      const yearLevelValue = (model.yearLevel || '').toLowerCase();
+
+      if (departmentVal !== 'all' && model.department.toLowerCase() !== departmentVal) return false;
+      if (courseVal !== 'all' && model.course.toLowerCase() !== courseVal) return false;
+      if (yearLevels.length && !yearLevels.includes(yearLevelValue)) return false;
+    }
+
+    if (pageType === 'employees') {
+      const departmentVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
+      const positionVal = (document.getElementById('exportPositionSelect')?.value || 'all').toLowerCase();
+
+      if (departmentVal !== 'all' && model.department.toLowerCase() !== departmentVal) return false;
+      if (positionVal !== 'all' && model.position.toLowerCase() !== positionVal) return false;
+    }
+
+    if (pageType === 'attendance') {
+      const dateFrom = normalizeDate(document.getElementById('exportDateFrom')?.value || '');
+      const dateTo = normalizeDate(document.getElementById('exportDateTo')?.value || '');
+      const selectedTypes = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((input) => input.value.toLowerCase());
+      const isAllSelected = selectedTypes.includes('all') || !selectedTypes.length;
+      const modelType = (model.typeValue || '').toLowerCase();
+
+      if (dateFrom && model.dateValue < dateFrom) return false;
+      if (dateTo && model.dateValue > dateTo) return false;
+      if (!isAllSelected && !selectedTypes.includes(modelType)) return false;
+    }
+
+    return true;
+  });
+
+  filteredRows.sort((left, right) => {
+    const leftValue = getExportSortValue(pageType, left, primarySort).toString().toLowerCase();
+    const rightValue = getExportSortValue(pageType, right, primarySort).toString().toLowerCase();
+    const comparison = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
+    return sortOrder === 'desc' ? comparison * -1 : comparison;
+  });
+
+  return filteredRows;
+}
+
+async function handleExport() {
+  const pageType = exportState.entity || tableState.pageType;
+  if (!pageType || pageType === 'generic') {
+    showToast('Export is not available on this page.', 'error');
+    return;
+  }
+
+  // Collect filters based on page type
+  const filters = {};
+
+  if (pageType === 'students') {
+    filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
+    filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
+    filters.course = document.getElementById('exportCourseSelect')?.value || 'all';
+    filters.yearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
+  } else if (pageType === 'employees') {
+    filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
+    filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
+    filters.position = document.getElementById('exportPositionSelect')?.value || 'all';
+  } else if (pageType === 'attendance') {
+    filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
+    filters.dateFrom = document.getElementById('exportDateFrom')?.value || '';
+    filters.dateTo = document.getElementById('exportDateTo')?.value || '';
+    filters.userTypes = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((input) => input.value);
+  }
+
+  const formData = new FormData();
+  formData.append('type', pageType);
+  formData.append('filters', JSON.stringify(filters));
+
+  try {
+    const response = await fetch('../backend/api/export.php', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+      throw new Error('Export failed. Please try again.');
+    }
+
+    // Get the blob and download it
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${pageType}-records.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast('Export completed successfully.', 'success');
+    closeExportModal();
+  } catch (error) {
+    console.error('Export error:', error);
+    showToast('Export failed. Please try again.', 'error');
+  }
+}
+
 // ── Shared API helper ─────────────────────────────────────────────────────────
 
 async function apiRequest(endpoint, method, body) {
@@ -698,8 +1150,8 @@ async function reloadTable() {
     const payload = await response.json();
     const rows    = Array.isArray(payload.data) ? payload.data : [];
 
-    tableState.rows         = rows;
-    tableState.filteredRows = rows.slice();
+    tableState.rows = tableState.pageType === 'users' ? mergeUserOverrides(rows) : rows;
+    tableState.filteredRows = tableState.rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
       populateDepartmentSelect(rows);
@@ -729,6 +1181,105 @@ function openAddUserModal() {
 
 function closeAddUserModal() {
   document.getElementById('addUserModal')?.classList.remove('show');
+}
+
+function openViewUserModal(record) {
+  const modal = document.getElementById('viewUserModal');
+  if (!modal) return;
+
+  const setValue = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.value = escapeText(value);
+  };
+
+  const setText = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.textContent = escapeText(value);
+  };
+
+  setValue('viewUserEmployeeNumber', record.employee_number);
+  setValue('viewUserName', record.name);
+  setValue('viewUserUsername', record.username);
+  setValue('viewUserEmail', record.email);
+  setValue('viewUserRole', record.role);
+  setValue('viewUserStatus', record.is_active ? 'Active' : 'Inactive');
+  setText('viewUserCreatedAt', record.created_at || '-');
+  setText('viewUserUpdatedAt', record.updated_at || '-');
+
+  modal.classList.add('show');
+}
+
+function closeViewUserModal() {
+  document.getElementById('viewUserModal')?.classList.remove('show');
+}
+
+function openEditUserModal(record) {
+  const modal = document.getElementById('editUserModal');
+  if (!modal) { showToast('Edit modal not found.', 'error'); return; }
+
+  const setValue = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) element.value = escapeText(value);
+  };
+
+  setValue('editUserEmployeeNumber', record.employee_number);
+  setValue('editUserName', record.name);
+  setValue('editUserUsername', record.username);
+  setValue('editUserEmail', record.email);
+  setValue('editUserRole', record.role === 'Super Admin' ? 'Superadmin' : record.role);
+  setValue('editUserStatus', record.is_active ? 'Active' : 'Inactive');
+
+  modal._record = record;
+  modal.classList.add('show');
+}
+
+function closeEditUserModal() {
+  document.getElementById('editUserModal')?.classList.remove('show');
+}
+
+function openUpdateUserModal() {
+  const modal = document.getElementById('updateUserModal');
+  const confirmBtn = document.getElementById('updateUserConfirm');
+  if (!modal) return;
+
+  const closeModal = () => {
+    modal.classList.remove('show');
+    confirmBtn?.removeEventListener('click', closeModal);
+  };
+
+  confirmBtn?.addEventListener('click', closeModal);
+  modal.classList.add('show');
+}
+
+async function saveEditUser() {
+  const modal = document.getElementById('editUserModal');
+  const record = modal?._record;
+
+  if (!record) {
+    showToast('User record not found.', 'error');
+    return;
+  }
+
+  const username = document.getElementById('editUserUsername')?.value.trim() || '';
+  const email = document.getElementById('editUserEmail')?.value.trim() || '';
+  const role = document.getElementById('editUserRole')?.value || '';
+  const status = document.getElementById('editUserStatus')?.value || '';
+
+  if (!username) { showToast('Username is required.', 'error'); return; }
+  if (!email) { showToast('Email is required.', 'error'); return; }
+  if (!role) { showToast('Role is required.', 'error'); return; }
+
+  saveUserOverride(record, {
+    username,
+    email,
+    role: role === 'Superadmin' ? 'Superadmin' : role,
+    is_active: status === 'Active',
+    updated_at: new Date().toISOString().slice(0, 19).replace('T', ' '),
+  });
+
+  closeEditUserModal();
+  await reloadTable();
+  openUpdateUserModal();
 }
 
 // saveAddUser is fully handled by the inline <script> in users.html.
@@ -825,6 +1376,7 @@ async function saveAddStudent() {
   const body = {
     first_name:      get('addStudentFirstName'),
     middle_name:     get('addStudentMiddleName'),
+    suffix:          get('addStudentSuffix'),
     last_name:       get('addStudentLastName'),
     student_number:  get('addStudentNumber'),
     course:          get('addStudentCourse'),
@@ -833,8 +1385,8 @@ async function saveAddStudent() {
     rfid_uid:        get('addStudentRfid'),
   };
 
-  if (!body.first_name || !body.last_name || !body.student_number) {
-    showToast('First name, last name, and student number are required.', 'error');
+  if (!body.first_name || !body.last_name || !body.student_number || !body.course || !body.year_level || !body.department) {
+    showToast('First name, last name, student number, course, year level, and department are required.', 'error');
     return;
   }
 
@@ -935,6 +1487,7 @@ async function saveAddEmployee() {
   const body = {
     first_name:      get('addEmployeeFirstName'),
     middle_name:     get('addEmployeeMiddleName'),
+    suffix:          get('addEmployeeSuffix'),
     last_name:       get('addEmployeeLastName'),
     employee_number: get('addEmployeeNumber'),
     department:      get('addEmployeeDepartment'),
@@ -942,8 +1495,8 @@ async function saveAddEmployee() {
     rfid_uid:        get('addEmployeeRfid'),
   };
 
-  if (!body.first_name || !body.last_name || !body.employee_number) {
-    showToast('First name, last name, and employee number are required.', 'error');
+  if (!body.first_name || !body.last_name || !body.employee_number || !body.department || !body.position) {
+    showToast('First name, last name, employee number, department, and designation/position are required.', 'error');
     return;
   }
 
@@ -1067,6 +1620,10 @@ function bindImportControls() {
   }
 }
 
+function bindExportControls() {
+  document.getElementById('openExportBtn')?.addEventListener('click', openExportModal);
+}
+
 function bindAddButtons() {
   document.getElementById('addStudentBtn')?.addEventListener('click', openAddStudentModal);
   document.getElementById('addEmployeeBtn')?.addEventListener('click', openAddEmployeeModal);
@@ -1086,6 +1643,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   await loadTableData();
   bindImportControls();
+  bindExportControls();
   bindAddButtons();
 
   const currentPage = window.location.pathname.split('/').pop();

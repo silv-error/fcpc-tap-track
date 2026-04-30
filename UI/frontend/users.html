@@ -149,8 +149,7 @@
               <th>Email</th>
               <th>Role</th>
               <th>Status</th>
-              <th>Created At</th>
-              <th>Updated At</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -269,6 +268,111 @@
     <div class="overview-actions">
       <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeAddUserModal()">Cancel</button>
       <button type="button" class="overview-back-btn" id="saveUserBtn" onclick="saveAddUser()" style="display:none;">Add User</button>
+    </div>
+  </div>
+</div>
+
+<!-- View User Modal -->
+<div id="viewUserModal" class="modal">
+  <div class="modal-overlay" onclick="closeViewUserModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Information Overview</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="viewUserEmployeeNumber">Employee No.:</label>
+        <input id="viewUserEmployeeNumber" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserName">Name:</label>
+        <input id="viewUserName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserUsername">Username:</label>
+        <input id="viewUserUsername" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserEmail">Email:</label>
+        <input id="viewUserEmail" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserRole">Role:</label>
+        <input id="viewUserRole" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewUserStatus">Status:</label>
+        <input id="viewUserStatus" type="text" readonly />
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-meta-row">
+      <div>
+        <span>Created At:</span>
+        <strong id="viewUserCreatedAt">-</strong>
+      </div>
+      <div>
+        <span>Updated At:</span>
+        <strong id="viewUserUpdatedAt">-</strong>
+      </div>
+    </div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn" onclick="closeViewUserModal()">Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit User Modal -->
+<div id="editUserModal" class="modal">
+  <div class="modal-overlay" onclick="closeEditUserModal()"></div>
+  <div class="modal-content overview-modal-content">
+    <div class="overview-header">Edit User</div>
+    <div class="overview-grid">
+      <div class="overview-field">
+        <label for="editUserEmployeeNumber">Employee No.:</label>
+        <input id="editUserEmployeeNumber" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editUserName">Name:</label>
+        <input id="editUserName" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editUserUsername" class="edit-label-active">Username:</label>
+        <input id="editUserUsername" type="text" class="edit-input-active" />
+      </div>
+      <div class="overview-field">
+        <label for="editUserEmail" class="edit-label-active">Email:</label>
+        <input id="editUserEmail" type="email" class="edit-input-active" />
+      </div>
+      <div class="overview-field">
+        <label for="editUserRole" class="edit-label-active">Role:</label>
+        <select id="editUserRole" class="edit-input-active overview-select">
+          <option value="Admin">Admin</option>
+          <option value="Superadmin">Super Admin</option>
+        </select>
+      </div>
+      <div class="overview-field">
+        <label for="editUserStatus" class="edit-label-active">Status:</label>
+        <select id="editUserStatus" class="edit-input-active overview-select">
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="overview-divider"></div>
+    <div class="overview-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeEditUserModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveEditUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Update User Success Modal -->
+<div id="updateUserModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <h2 class="modal-title">This page says</h2>
+    <p class="modal-message">User updated on this page.</p>
+    <div class="modal-buttons">
+      <button id="updateUserConfirm" class="modal-btn modal-btn-confirm">OK</button>
     </div>
   </div>
 </div>
