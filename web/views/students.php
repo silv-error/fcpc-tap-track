@@ -39,8 +39,8 @@ require_once __DIR__ . '/../api/csrf.php';
         <img src="images/default-logo.png" alt="Default Logo" />
       </div>
       <div class="sidebar-user-info">
-        <h3>User, Test</h3>
-        <p>Administrator</p>
+        <h3><?= htmlspecialchars($_SESSION['full_name'] ?? 'User') ?></h3>
+        <p><?= htmlspecialchars($_SESSION['role'] ?? 'Administrator') ?></p>
       </div>
     </div>
 
