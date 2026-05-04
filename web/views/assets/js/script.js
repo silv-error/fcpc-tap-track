@@ -16,6 +16,10 @@ const exportState = {
   entity: '',
 };
 
+const realtimeState = {
+  timer: null,
+};
+
 function escapeText(value) {
   return value === null || value === undefined || value === '' ? '-' : String(value);
 }
@@ -468,7 +472,7 @@ function populatePositionSelect(rows) {
   }
 }
 
-function applyFilters() {
+function applyFilters(resetToFirstPage = true) {
   const searchInput      = document.getElementById('searchInput');
   const typeSelect       = document.getElementById('typeSelect');
   const dateInput        = document.getElementById('dateInput');
@@ -498,7 +502,9 @@ function applyFilters() {
     );
   });
 
-  tableState.currentPage = 1;
+  if (resetToFirstPage) {
+    tableState.currentPage = 1;
+  }
   renderCurrentPage();
 }
 
@@ -1225,9 +1231,35 @@ async function reloadTable() {
       populatePositionSelect(rows);
     }
 
-    applyFilters();
+    applyFilters(false);
   } catch (error) {
     console.error('Failed to reload table:', error);
+  }
+}
+
+function isModalOpen() {
+  return Boolean(document.querySelector('.modal.show'));
+}
+
+function startRealtimeTableRefresh() {
+  if (!tableState.table || !tableState.pageType || tableState.pageType === 'generic') {
+    return;
+  }
+
+  const refreshMs = tableState.pageType === 'attendance' ? 2000 : 5000;
+
+  stopRealtimeTableRefresh();
+
+  realtimeState.timer = window.setInterval(() => {
+    if (document.hidden || isModalOpen()) return;
+    reloadTable();
+  }, refreshMs);
+}
+
+function stopRealtimeTableRefresh() {
+  if (realtimeState.timer !== null) {
+    window.clearInterval(realtimeState.timer);
+    realtimeState.timer = null;
   }
 }
 
@@ -1703,6 +1735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLoadingSkeletons();
 
   await loadTableData();
+  startRealtimeTableRefresh();
   bindImportControls();
   bindExportControls();
   bindAddButtons();
@@ -1720,6 +1753,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 });
+
+window.addEventListener('beforeunload', stopRealtimeTableRefresh);
 // ============================================================
 // LIVE RFID UID AUTO-FETCH FOR ADD STUDENT MODAL
 // ============================================================
