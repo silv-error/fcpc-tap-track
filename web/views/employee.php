@@ -334,12 +334,12 @@ require_once __DIR__ . '/../api/csrf.php';
         <input id="addEmployeeMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeSuffix">Suffix:</label>
-        <input id="addEmployeeSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
-      </div>
-      <div class="overview-field">
         <label for="addEmployeeLastName">Last Name:<span class="field-required">*</span></label>
         <input id="addEmployeeLastName" type="text" class="edit-input-active" placeholder="Last name" />
+      </div>
+      <div class="overview-field">
+        <label for="addEmployeeSuffix">Suffix:</label>
+        <input id="addEmployeeSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
       </div>
       <div class="overview-field">
         <label for="addEmployeeNumber">Employee No.:<span class="field-required">*</span></label>
