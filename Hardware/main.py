@@ -48,6 +48,9 @@ class AttendanceBackend:
         print()
         print(f"[SCAN] UID detected: {uid}")
 
+        # Save latest tapped RFID UID for PHP Add Student form auto-fill.
+        self.database_manager.save_rfid_uid_to_buffer(uid)
+
         result = self.attendance_service.process_rfid_tap(uid)
 
         if not result.get("success"):
