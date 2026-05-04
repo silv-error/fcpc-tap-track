@@ -1,15 +1,29 @@
+<?php
+
+require_once __DIR__ . '/../config/session.php';
+session_start();
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
+}
+
+require_once __DIR__ . '/../api/csrf.php';
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Employee | FCPC Attendance Tracker</title>
+  <title>Students | FCPC Attendance Tracker</title>
   <script>
     if (localStorage.getItem('sidebar-collapsed') === '1') {
       document.documentElement.classList.add('sidebar-collapsed');
     }
   </script>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
 
@@ -18,6 +32,7 @@
 
 <div class="dashboard-layout">
 
+  <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-user">
       <div class="sidebar-avatar">
@@ -30,25 +45,25 @@
     </div>
 
     <nav class="sidebar-nav">
-      <a href="users.html">
+      <a href="users.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
         </svg>
         Users
       </a>
-      <a href="students.html">
+      <a href="students.php" class="active">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L21 9l-9-6zm0 4.2L17.53 10 12 12.8 6.47 10 12 7.2zM7 12.7l5 2.73 5-2.73v3.16L12 18.6l-5-2.74v-3.16z"/>
         </svg>
         Students
       </a>
-      <a href="employee.html" class="active">
+      <a href="employee.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4zm8-4h2v2h-2v2h-2v-2h-2v-2h2V8h2v2z"/>
         </svg>
         Employees
       </a>
-      <a href="attendance.html">
+      <a href="attendance.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
         </svg>
@@ -84,7 +99,7 @@
     </header>
 
     <main class="page-content">
-      <h1 class="page-title">Employees</h1>
+      <h1 class="page-title">Students</h1>
       <hr class="page-divider" />
 
       <div class="table-toolbar">
@@ -95,26 +110,30 @@
               type="text"
               id="searchInput"
               class="filter-input"
-              placeholder="Search by Employee No./RFID UID/Name"
+              placeholder="Search by Student No./RFID UID/Name"
             />
           </div>
-
           <div class="filter-group">
             <label for="departmentSelect">Department</label>
             <select id="departmentSelect" class="filter-select">
               <option value="all">All Departments</option>
             </select>
           </div>
-
           <div class="filter-group">
-            <label for="positionSelect">Position</label>
-            <select id="positionSelect" class="filter-select">
-              <option value="all">All Positions</option>
+            <label for="yearLevelSelect">Year Level</label>
+            <select id="yearLevelSelect" class="filter-select">
+              <option value="all">All Year Levels</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="courseSelect">Course</label>
+            <select id="courseSelect" class="filter-select">
+              <option value="all">All Courses</option>
             </select>
           </div>
         </div>
         <div class="table-toolbar-actions">
-          <button id="addEmployeeBtn" class="toolbar-btn toolbar-btn-primary" type="button">+ Add Employee</button>
+          <button id="addStudentBtn" class="toolbar-btn toolbar-btn-primary" type="button">+ Add Student</button>
           <button id="openImportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
               <path d="M12 3v10"/>
@@ -135,13 +154,14 @@
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table" data-endpoint="../backend/api/employees.php" data-table-type="employees">
+        <table class="data-table" data-endpoint="../api/students.php" data-table-type="students">
           <thead>
             <tr>
-              <th>Employee No.</th>
+              <th>Student No.</th>
               <th>RFID UID</th>
               <th>Name</th>
-              <th>Position</th>
+              <th>Course</th>
+              <th>Year Level</th>
               <th>Department</th>
               <th>Actions</th>
             </tr>
@@ -176,55 +196,59 @@
   </div>
 </div>
 
-<!-- Edit Employee Modal removed -->
 
-<div id="viewEmployeeModal" class="modal">
+<!-- View Student Modal -->
+<div id="viewStudentModal" class="modal">
   <div class="modal-overlay"></div>
   <div class="modal-content overview-modal-content">
     <div class="overview-header">Information Overview</div>
     <div class="overview-grid">
       <div class="overview-field">
-        <label for="viewEmployeeFirstName">First Name:</label>
-        <input id="viewEmployeeFirstName" type="text" readonly />
+        <label for="viewStudentFirstName">First Name:</label>
+        <input id="viewStudentFirstName" type="text" readonly />
       </div>
       <div class="overview-field">
-        <label for="viewEmployeeMiddleName">Middle Name:</label>
-        <input id="viewEmployeeMiddleName" type="text" readonly />
+        <label for="viewStudentMiddleName">Middle Name:</label>
+        <input id="viewStudentMiddleName" type="text" readonly />
       </div>
       <div class="overview-field">
-        <label for="viewEmployeeLastName">Last Name:</label>
-        <input id="viewEmployeeLastName" type="text" readonly />
+        <label for="viewStudentLastName">Last Name:</label>
+        <input id="viewStudentLastName" type="text" readonly />
       </div>
       <div class="overview-field">
-        <label for="viewEmployeeNumber">Employee ID:</label>
-        <input id="viewEmployeeNumber" type="text" readonly />
+        <label for="viewStudentNumber">Student No.:</label>
+        <input id="viewStudentNumber" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentCourse">Course:</label>
+        <input id="viewStudentCourse" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentYearLevel">Year Level:</label>
+        <input id="viewStudentYearLevel" type="text" readonly />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="viewEmployeeDepartment">Department:</label>
-        <input id="viewEmployeeDepartment" type="text" readonly />
+        <label for="viewStudentDepartment">Department:</label>
+        <input id="viewStudentDepartment" type="text" readonly />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="viewEmployeePosition">Designation/Position:</label>
-        <input id="viewEmployeePosition" type="text" readonly />
-      </div>
-      <div class="overview-field overview-field-full">
-        <label for="viewEmployeeRfid">RFID UID:</label>
-        <input id="viewEmployeeRfid" type="text" readonly />
+        <label for="viewStudentRfid">RFID UID:</label>
+        <input id="viewStudentRfid" type="text" readonly />
       </div>
     </div>
     <div class="overview-divider"></div>
     <div class="overview-meta-row">
       <div>
         <span>Created At:</span>
-        <strong id="viewEmployeeCreatedAt">-</strong>
+        <strong id="viewStudentCreatedAt">-</strong>
       </div>
       <div>
         <span>Updated At:</span>
-        <strong id="viewEmployeeUpdatedAt">-</strong>
+        <strong id="viewStudentUpdatedAt">-</strong>
       </div>
     </div>
     <div class="overview-actions">
-      <button type="button" class="overview-back-btn" onclick="closeViewEmployeeModal()">Back</button>
+      <button type="button" class="overview-back-btn" onclick="closeViewStudentModal()">Back</button>
     </div>
   </div>
 </div>
@@ -253,7 +277,7 @@
 <div id="exportModal" class="modal">
   <div class="modal-overlay" onclick="closeExportModal()"></div>
   <div class="modal-content overview-modal-content export-modal-content">
-    <div id="exportModalTitle" class="overview-header">Export Employee Records</div>
+    <div id="exportModalTitle" class="overview-header">Export Student Records</div>
     <div id="exportModalBody" class="export-modal-body"></div>
     <div class="export-modal-actions">
       <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeExportModal()">Cancel</button>
@@ -262,92 +286,106 @@
   </div>
 </div>
 
-<!-- Edit Employee Modal -->
-<div id="editEmployeeModal" class="modal">
-  <div class="modal-overlay" onclick="closeEditEmployeeModal()"></div>
+<!-- Edit Student Modal -->
+<div id="editStudentModal" class="modal">
+  <div class="modal-overlay" onclick="closeEditStudentModal()"></div>
   <div class="modal-content overview-modal-content">
-    <div class="overview-header">Edit Employee</div>
+    <div class="overview-header">Edit Student</div>
     <div class="overview-grid">
       <div class="overview-field">
-        <label for="editEmployeeFirstName">First Name:</label>
-        <input id="editEmployeeFirstName" type="text" readonly />
+        <label for="editStudentFirstName">First Name:</label>
+        <input id="editStudentFirstName" type="text" readonly />
       </div>
       <div class="overview-field">
-        <label for="editEmployeeMiddleName">Middle Name:</label>
-        <input id="editEmployeeMiddleName" type="text" readonly />
+        <label for="editStudentMiddleName">Middle Name:</label>
+        <input id="editStudentMiddleName" type="text" readonly />
       </div>
       <div class="overview-field">
-        <label for="editEmployeeLastName">Last Name:</label>
-        <input id="editEmployeeLastName" type="text" readonly />
+        <label for="editStudentLastName">Last Name:</label>
+        <input id="editStudentLastName" type="text" readonly />
       </div>
       <div class="overview-field">
-        <label for="editEmployeeNumber">Employee No.:</label>
-        <input id="editEmployeeNumber" type="text" readonly />
+        <label for="editStudentNumber">Student No.:</label>
+        <input id="editStudentNumber" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentCourse">Course:</label>
+        <input id="editStudentCourse" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentYearLevel">Year Level:</label>
+        <input id="editStudentYearLevel" type="text" readonly />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="editEmployeeDepartment">Department:</label>
-        <input id="editEmployeeDepartment" type="text" readonly />
+        <label for="editStudentDepartment">Department:</label>
+        <input id="editStudentDepartment" type="text" readonly />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="editEmployeePosition">Designation/Position:</label>
-        <input id="editEmployeePosition" type="text" readonly />
-      </div>
-      <div class="overview-field overview-field-full">
-        <label for="editEmployeeRfid" class="edit-label-active">RFID UID:</label>
-        <input id="editEmployeeRfid" type="text" class="edit-input-active" />
+        <label for="editStudentRfid" class="edit-label-active">RFID UID:</label>
+        <input id="editStudentRfid" type="text" class="edit-input-active" />
       </div>
     </div>
     <div class="overview-divider"></div>
     <div class="overview-actions">
-      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeEditEmployeeModal()">Cancel</button>
-      <button type="button" class="overview-back-btn" onclick="saveEditEmployee()">Save</button>
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeEditStudentModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveEditStudent()">Save</button>
     </div>
   </div>
 </div>
 
-<!-- Add Employee Modal -->
-<div id="addEmployeeModal" class="modal">
-  <div class="modal-overlay" onclick="closeAddEmployeeModal()"></div>
+<!-- Add Student Modal -->
+<div id="addStudentModal" class="modal">
+  <div class="modal-overlay" onclick="closeAddStudentModal()"></div>
   <div class="modal-content overview-modal-content">
-    <div class="overview-header">Add Employee</div>
+    <div class="overview-header">Add Student</div>
     <div class="overview-grid">
       <div class="overview-field">
-        <label for="addEmployeeFirstName">First Name:<span class="field-required">*</span></label>
-        <input id="addEmployeeFirstName" type="text" class="edit-input-active" placeholder="First name" />
+        <label for="addStudentFirstName">First Name:<span class="field-required">*</span></label>
+        <input id="addStudentFirstName" type="text" class="edit-input-active" placeholder="First name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeMiddleName">Middle Name:</label>
-        <input id="addEmployeeMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
+        <label for="addStudentMiddleName">Middle Name:</label>
+        <input id="addStudentMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeSuffix">Suffix:</label>
-        <input id="addEmployeeSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
+        <label for="addStudentSuffix">Suffix:</label>
+        <input id="addStudentSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeLastName">Last Name:<span class="field-required">*</span></label>
-        <input id="addEmployeeLastName" type="text" class="edit-input-active" placeholder="Last name" />
+        <label for="addStudentLastName">Last Name:<span class="field-required">*</span></label>
+        <input id="addStudentLastName" type="text" class="edit-input-active" placeholder="Last name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeNumber">Employee No.:<span class="field-required">*</span></label>
-        <input id="addEmployeeNumber" type="text" class="edit-input-active" placeholder="e.g. EMP-00001" />
+        <label for="addStudentNumber">Student No.:<span class="field-required">*</span></label>
+        <input id="addStudentNumber" type="text" class="edit-input-active" placeholder="Student No." />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentCourse">Course:<span class="field-required">*</span></label>
+        <input id="addStudentCourse" type="text" class="edit-input-active" placeholder="e.g. BSIT" />
+      </div>
+      <div class="overview-field">
+        <label for="addStudentYearLevel">Year Level:<span class="field-required">*</span></label>
+        <select id="addStudentYearLevel" class="edit-input-active overview-select">
+            <option value="">Select Year Level</option>
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+          </select>
       </div>
       <div class="overview-field overview-field-full">
-        <label for="addEmployeeDepartment">Department:<span class="field-required">*</span></label>
-        <input id="addEmployeeDepartment" type="text" class="edit-input-active" placeholder="Department" />
+        <label for="addStudentDepartment">Department:<span class="field-required">*</span></label>
+        <input id="addStudentDepartment" type="text" class="edit-input-active" placeholder="Department" />
       </div>
       <div class="overview-field overview-field-full">
-        <label for="addEmployeePosition">Designation/Position:<span class="field-required">*</span></label>
-        <input id="addEmployeePosition" type="text" class="edit-input-active" placeholder="e.g. Instructor" />
-      </div>
-      <div class="overview-field overview-field-full">
-        <label for="addEmployeeRfid">RFID UID:</label>
-        <input id="addEmployeeRfid" type="text" class="edit-input-active" placeholder="RFID UID" />
+        <label for="addStudentRfid">RFID UID:</label>
+        <input id="addStudentRfid" type="text" class="edit-input-active" placeholder="RFID UID" />
       </div>
     </div>
     <div class="overview-divider"></div>
     <div class="overview-actions">
-      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeAddEmployeeModal()">Cancel</button>
-      <button type="button" class="overview-back-btn" onclick="saveAddEmployee()">Add</button>
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeAddStudentModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="saveAddStudent()">Add</button>
     </div>
   </div>
 </div>

@@ -50,9 +50,8 @@ function format_display_name(string $lastName, string $firstName, ?string $middl
  */
 function resolve_display_name(array $row): string
 {
-    // Prefer student, fall back to employee, fall back to placeholder
     foreach (['s', 'e'] as $prefix) {
-        $last = trim((string) ($row["{$prefix}_last_name"]  ?? ''));
+        $last  = trim((string) ($row["{$prefix}_last_name"]  ?? ''));
         $first = trim((string) ($row["{$prefix}_first_name"] ?? ''));
 
         if ($last !== '' && $first !== '') {
@@ -93,9 +92,10 @@ function fetch_all_rows(mysqli $con, string $sql): array
     $result = mysqli_query($con, $sql);
 
     if (!$result) {
+        error_log('fetch_all_rows failed: ' . mysqli_error($con));
         json_response([
             'success' => false,
-            'message' => mysqli_error($con),
+            'message' => 'A database error occurred.',
             'data'    => [],
         ], 500);
     }
@@ -104,6 +104,44 @@ function fetch_all_rows(mysqli $con, string $sql): array
     while ($row = mysqli_fetch_assoc($result)) {
         $rows[] = $row;
     }
+
+    return $rows;
+}
+
+/**
+ * Executes a prepared statement and returns all rows as an associative array.
+ *
+ * @param mysqli  $con    Database connection
+ * @param string  $sql    SQL query with ? placeholders
+ * @param string  $types  bind_param type string (e.g. 'si', 'ss')
+ * @param mixed   ...$params  Values to bind, in placeholder order
+ */
+function fetch_all_rows_prepared(mysqli $con, string $sql, string $types, mixed ...$params): array
+{
+    $stmt = mysqli_prepare($con, $sql);
+
+    if (!$stmt) {
+        error_log('Prepare failed: ' . mysqli_error($con));
+        json_response(['success' => false, 'message' => 'A database error occurred.', 'data' => []], 500);
+    }
+
+    if ($types !== '' && $params !== []) {
+        mysqli_stmt_bind_param($stmt, $types, ...$params);
+    }
+
+    if (!mysqli_stmt_execute($stmt)) {
+        error_log('Execute failed: ' . mysqli_stmt_error($stmt));
+        json_response(['success' => false, 'message' => 'A database error occurred.', 'data' => []], 500);
+    }
+
+    $result = mysqli_stmt_get_result($stmt);
+    $rows   = [];
+
+    while ($row = mysqli_fetch_assoc($result)) {
+        $rows[] = $row;
+    }
+
+    mysqli_stmt_close($stmt);
 
     return $rows;
 }

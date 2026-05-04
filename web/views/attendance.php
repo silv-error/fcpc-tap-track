@@ -1,3 +1,16 @@
+<?php
+
+require_once __DIR__ . '/../config/session.php';
+session_start();
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
+}
+
+require_once __DIR__ . '/../api/csrf.php';
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -10,6 +23,7 @@
     }
   </script>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
 
@@ -33,25 +47,25 @@
 
     <!-- Navigation -->
     <nav class="sidebar-nav">
-      <a href="users.html">
+      <a href="users.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
         </svg>
         Users
       </a>
-      <a href="students.html">
+      <a href="students.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L21 9l-9-6zm0 4.2L17.53 10 12 12.8 6.47 10 12 7.2zM7 12.7l5 2.73 5-2.73v3.16L12 18.6l-5-2.74v-3.16z"/>
         </svg>
         Students
       </a>
-      <a href="employee.html">
+      <a href="employee.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4zm8-4h2v2h-2v2h-2v-2h-2v-2h2V8h2v2z"/>
         </svg>
         Employees
       </a>
-      <a href="attendance.html" class="active">
+      <a href="attendance.php" class="active">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
         </svg>
@@ -143,7 +157,7 @@
 
       <!-- Table -->
       <div class="table-wrapper">
-        <table class="data-table" data-endpoint="../backend/api/attendance.php" data-table-type="attendance">
+        <table class="data-table" data-endpoint="../api/attendance.php" data-table-type="attendance">
           <thead>
             <tr>
               <th>Date</th>

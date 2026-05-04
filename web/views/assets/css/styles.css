@@ -465,6 +465,32 @@ body {
   background-color: #2e2e80;
 }
 
+.login-message {
+  display: none;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.login-message:not([hidden]) {
+  display: block;
+}
+
+.login-message.success {
+  background: #e8f5ee;
+  color: #245c43;
+  border: 1px solid #bfe3cf;
+}
+
+.login-message.error {
+  background: #fdecec;
+  color: #a91f1f;
+  border: 1px solid #f3c0c0;
+}
+
 .remember-row {
   display: flex;
   align-items: center;

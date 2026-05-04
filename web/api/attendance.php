@@ -1,10 +1,14 @@
 <?php
 
-require_once __DIR__ . '/../../connection.php';
+require_once __DIR__ . '/../config/session.php';
+session_start();
+
+require_once __DIR__ . '/../config/connection.php'; 
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/auth_check.php';
 
 // All name/department formatting is intentionally left to PHP (see helpers.php)
-// so the query stays DB-agnostic and works identically with MySQL and SQLite.
+// so the query stays DB-agnostic
 $sql = "
     SELECT
         a.id,

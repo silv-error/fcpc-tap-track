@@ -80,10 +80,10 @@ function inferPageType(table) {
   }
 
   const page = window.location.pathname.split('/').pop();
-  if (page === 'students.html')  return 'students';
-  if (page === 'employee.html')  return 'employees';
-  if (page === 'attendance.html') return 'attendance';
-  if (page === 'users.html')     return 'users';
+  if (page === 'students.php')  return 'students';
+  if (page === 'employee.php')  return 'employees';
+  if (page === 'attendance.php') return 'attendance';
+  if (page === 'users.php')     return 'users';
   return 'generic';
 }
 
@@ -622,21 +622,60 @@ function togglePassword() {
   }
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
   if (e) e.preventDefault();
 
   const email    = document.getElementById('email')?.value.trim();
   const password = document.getElementById('password')?.value;
+  const btn      = document.querySelector('#loginForm .btn-login');
+  const message  = document.getElementById('loginMessage');
+
+  const showLoginMessage = (text, type = 'error') => {
+    if (!message) return;
+    message.textContent = text;
+    message.className = `login-message ${type}`;
+    message.hidden = false;
+  };
+
+  const clearLoginMessage = () => {
+    if (!message) return;
+    message.textContent = '';
+    message.className = 'login-message';
+    message.hidden = true;
+  };
 
   if (!email || !password) {
-    alert('Please enter your email/username and password.');
+    showLoginMessage('Please enter your email/username and password.');
     return;
   }
 
-  if (email === 'admin' && password === 'admin123') {
-    navigateWithTransition('users.html');
-  } else {
-    alert('Invalid credentials. Use admin / admin123 for demo.');
+  clearLoginMessage();
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Logging in…'; }
+
+  try {
+    const res  = await fetch('login.php', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
+      body:    JSON.stringify({ email, password }),
+    });
+
+    const contentType = res.headers.get('content-type') || '';
+    const json = contentType.includes('application/json')
+      ? await res.json()
+      : { success: false, message: await res.text() };
+
+    if (json.success) {
+      showLoginMessage(json.message || 'Login successful.', 'success');
+      navigateWithTransition('users.php');
+    } else {
+      showLoginMessage(json.message || 'Invalid credentials.');
+    }
+  } catch (err) {
+    showLoginMessage('Unable to reach the server. Please try again.');
+    console.error('Login error:', err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Log in'; }
   }
 }
 
@@ -702,7 +741,15 @@ function handleLogout() {
 
   modal.classList.add('show');
 
-  const confirmHandler = () => navigateWithTransition('index.html');
+  const confirmHandler = async () => {
+    try {
+      await fetch('logout.php', { method: 'POST', headers: { 'X-CSRF-Token': getCsrfToken(), 'Accept': 'application/json' } });
+    } catch (e) {
+      console.warn('Logout request failed:', e);
+    } finally {
+      navigateWithTransition('index.php');
+    }
+  };
 
   const cancelHandler = () => {
     modal.classList.remove('show');
@@ -1087,7 +1134,7 @@ async function handleExport() {
   formData.append('filters', JSON.stringify(filters));
 
   try {
-    const response = await fetch('../backend/api/export.php', {
+    const response = await fetch('../../api/export.php', {
       method: 'POST',
       body: formData,
     });
@@ -1118,10 +1165,24 @@ async function handleExport() {
 
 // ── Shared API helper ─────────────────────────────────────────────────────────
 
+function getCsrfToken() {
+  return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+}
+
 async function apiRequest(endpoint, method, body) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept':       'application/json',
+  };
+
+  // Attach token for all state-changing methods
+  if (['POST', 'PATCH', 'PUT', 'DELETE'].includes(method)) {
+    headers['X-CSRF-Token'] = getCsrfToken();
+  }
+
   const response = await fetch(endpoint, {
     method,
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    headers,
     body: JSON.stringify(body),
   });
 
@@ -1173,7 +1234,7 @@ async function reloadTable() {
 // ── Users ─────────────────────────────────────────────────────────────────────
 
 // openAddUserModal / closeAddUserModal / saveAddUser are defined inline in
-// users.html (the employee-search modal script) and take precedence here.
+// users.php (the employee-search modal script) and take precedence here.
 // These stubs are kept so other pages that include script.js don't break.
 function openAddUserModal() {
   document.getElementById('addUserModal')?.classList.add('show');
@@ -1282,7 +1343,7 @@ async function saveEditUser() {
   openUpdateUserModal();
 }
 
-// saveAddUser is fully handled by the inline <script> in users.html.
+// saveAddUser is fully handled by the inline <script> in users.php.
 // Defining a no-op here prevents "not defined" errors on other pages.
 if (typeof saveAddUser === 'undefined') {
   window.saveAddUser = function () {};
@@ -1349,7 +1410,7 @@ async function saveEditStudent() {
   const rfid = document.getElementById('editStudentRfid')?.value.trim() || '';
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../backend/api/students.php';
+    const endpoint = getEndpoint(tableState.table) || '../../api/students.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
     showToast('Student RFID updated successfully.', 'success');
     closeEditStudentModal();
@@ -1391,7 +1452,7 @@ async function saveAddStudent() {
   }
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../backend/api/students.php';
+    const endpoint = getEndpoint(tableState.table) || '../../api/students.php';
     await apiRequest(endpoint, 'POST', body);
     showToast('Student added successfully.', 'success');
     closeAddStudentModal();
@@ -1460,7 +1521,7 @@ async function saveEditEmployee() {
   const rfid = document.getElementById('editEmployeeRfid')?.value.trim() || '';
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../backend/api/employees.php';
+    const endpoint = getEndpoint(tableState.table) || '../../api/employees.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
     showToast('Employee RFID updated successfully.', 'success');
     closeEditEmployeeModal();
@@ -1501,7 +1562,7 @@ async function saveAddEmployee() {
   }
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../backend/api/employees.php';
+    const endpoint = getEndpoint(tableState.table) || '../../api/employees.php';
     await apiRequest(endpoint, 'POST', body);
     showToast('Employee added successfully.', 'success');
     closeAddEmployeeModal();
@@ -1546,7 +1607,7 @@ async function handleImportFile(file) {
 
   const entity   = importState.entity;
   const endpoint = getEndpoint(tableState.table)
-    || `../backend/api/${entity}.php`;
+    || `../../api/${entity}.php`;
 
   const formData = new FormData();
   formData.append('file', file);

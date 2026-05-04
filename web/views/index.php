@@ -1,3 +1,17 @@
+<?php
+
+require_once __DIR__ . '/../config/session.php';
+session_start();
+
+// If already logged in, redirect to users page
+if (!empty($_SESSION['user_id'])) {
+  header('Location: users.php');
+  exit;
+}
+
+require_once __DIR__ . '/../api/csrf.php';
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,6 +19,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Login | FCPC Attendance Tracker</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
 
@@ -65,6 +80,8 @@
         </div>
 
         <button type="submit" class="btn-login">Log in</button>
+
+        <div id="loginMessage" class="login-message" role="alert" aria-live="polite" hidden></div>
 
         <div class="remember-row">
           <input type="checkbox" id="rememberMe" />

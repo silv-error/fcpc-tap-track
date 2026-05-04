@@ -1,18 +1,22 @@
 <?php
 
-require_once __DIR__ . '/../../connection.php';
+require_once __DIR__ . '/../config/session.php';
+session_start();
+
+require_once __DIR__ . '/../config/connection.php';
 require_once __DIR__ . '/helpers.php';
-require_once __DIR__ . '/../../../vendor/autoload.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/auth_check.php';
 
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Color;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
+// Read and validate input AFTER auth check
 $exportType = $_POST['type'] ?? '';
-$filters = json_decode($_POST['filters'] ?? '{}', true);
+$filters    = json_decode($_POST['filters'] ?? '{}', true) ?? [];
 
 if (!$exportType || !in_array($exportType, ['students', 'employees', 'attendance'], true)) {
     http_response_code(400);
@@ -21,70 +25,70 @@ if (!$exportType || !in_array($exportType, ['students', 'employees', 'attendance
 }
 
 try {
-    $data = [];
+    $data    = [];
     $headers = [];
 
     if ($exportType === 'students') {
-        $sql = "SELECT id, student_number, rfid_uid, last_name, first_name, middle_name, course, year_level, department, created_at FROM students ORDER BY last_name ASC, first_name ASC";
-        $data = fetch_all_rows($con, $sql);
+        $sql = "
+            SELECT id, student_number, rfid_uid, last_name, first_name, middle_name,
+                   course, year_level, department, created_at
+            FROM students
+            ORDER BY last_name ASC, first_name ASC
+        ";
+        $data    = fetch_all_rows($con, $sql);
         $headers = ['Student No.', 'RFID UID', 'Name', 'Course', 'Year Level', 'Department'];
 
         if (!empty($filters['search'])) {
             $search = strtolower($filters['search']);
             $data = array_filter($data, function ($row) use ($search) {
-                $fullName = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
+                $fullName  = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
                 $studentNo = strtolower($row['student_number']);
-                return strpos($fullName, $search) !== false || strpos($studentNo, $search) !== false;
+                return str_contains($fullName, $search) || str_contains($studentNo, $search);
             });
         }
 
         if (!empty($filters['department']) && $filters['department'] !== 'all') {
             $dept = strtolower($filters['department']);
-            $data = array_filter($data, function ($row) use ($dept) {
-                return strtolower($row['department']) === $dept;
-            });
+            $data = array_filter($data, fn($row) => strtolower($row['department']) === $dept);
         }
 
         if (!empty($filters['course']) && $filters['course'] !== 'all') {
             $course = strtolower($filters['course']);
-            $data = array_filter($data, function ($row) use ($course) {
-                return strtolower($row['course']) === $course;
-            });
+            $data = array_filter($data, fn($row) => strtolower($row['course']) === $course);
         }
 
         if (!empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
             $levels = array_map('strtolower', $filters['yearLevels']);
-            $data = array_filter($data, function ($row) use ($levels) {
-                return in_array(strtolower($row['year_level']), $levels, true);
-            });
+            $data = array_filter($data, fn($row) => in_array(strtolower($row['year_level']), $levels, true));
         }
 
     } elseif ($exportType === 'employees') {
-        $sql = "SELECT id, employee_number, rfid_uid, last_name, first_name, middle_name, position, department, created_at FROM employees ORDER BY last_name ASC, first_name ASC";
-        $data = fetch_all_rows($con, $sql);
+        $sql = "
+            SELECT id, employee_number, rfid_uid, last_name, first_name, middle_name,
+                   position, department, created_at
+            FROM employees
+            ORDER BY last_name ASC, first_name ASC
+        ";
+        $data    = fetch_all_rows($con, $sql);
         $headers = ['Employee No.', 'RFID UID', 'Name', 'Position', 'Department'];
 
         if (!empty($filters['search'])) {
             $search = strtolower($filters['search']);
             $data = array_filter($data, function ($row) use ($search) {
                 $fullName = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
-                $empNo = strtolower($row['employee_number']);
-                return strpos($fullName, $search) !== false || strpos($empNo, $search) !== false;
+                $empNo    = strtolower($row['employee_number']);
+                return str_contains($fullName, $search) || str_contains($empNo, $search);
             });
         }
 
         if (!empty($filters['department']) && $filters['department'] !== 'all') {
             $dept = strtolower($filters['department']);
-            $data = array_filter($data, function ($row) use ($dept) {
-                return strtolower($row['department']) === $dept;
-            });
+            $data = array_filter($data, fn($row) => strtolower($row['department']) === $dept);
         }
 
         if (!empty($filters['position']) && $filters['position'] !== 'all') {
             $pos = strtolower($filters['position']);
-            $data = array_filter($data, function ($row) use ($pos) {
-                return strtolower($row['position']) === $pos;
-            });
+            $data = array_filter($data, fn($row) => strtolower($row['position']) === $pos);
         }
 
     } elseif ($exportType === 'attendance') {
@@ -116,7 +120,7 @@ try {
             ORDER BY a.log_date DESC, a.time_in DESC
         ";
 
-        $data = fetch_all_rows($con, $sql);
+        $data    = fetch_all_rows($con, $sql);
         $headers = ['Date', 'ID', 'Name', 'Time In', 'Time Out'];
 
         if (!empty($filters['search'])) {
@@ -129,30 +133,24 @@ try {
                     $name = strtolower(trim($row['e_last_name'] . ', ' . $row['e_first_name']));
                 }
                 $refNum = strtolower($row['s_reference_number'] ?? $row['e_reference_number'] ?? '');
-                return strpos($name, $search) !== false || strpos($refNum, $search) !== false;
+                return str_contains($name, $search) || str_contains($refNum, $search);
             });
         }
 
         if (!empty($filters['dateFrom'])) {
             $dateFrom = $filters['dateFrom'];
-            $data = array_filter($data, function ($row) use ($dateFrom) {
-                return $row['log_date'] >= $dateFrom;
-            });
+            $data = array_filter($data, fn($row) => $row['log_date'] >= $dateFrom);
         }
 
         if (!empty($filters['dateTo'])) {
             $dateTo = $filters['dateTo'];
-            $data = array_filter($data, function ($row) use ($dateTo) {
-                return $row['log_date'] <= $dateTo;
-            });
+            $data = array_filter($data, fn($row) => $row['log_date'] <= $dateTo);
         }
 
         if (!empty($filters['userTypes']) && is_array($filters['userTypes'])) {
             $types = array_map('strtolower', $filters['userTypes']);
             if (!in_array('all', $types, true)) {
-                $data = array_filter($data, function ($row) use ($types) {
-                    return in_array(strtolower($row['record_type']), $types, true);
-                });
+                $data = array_filter($data, fn($row) => in_array(strtolower($row['record_type']), $types, true));
             }
         }
     }
@@ -160,7 +158,7 @@ try {
     $data = array_values($data);
 
     $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
+    $sheet       = $spreadsheet->getActiveSheet();
 
     $titleLabel = match ($exportType) {
         'students'   => 'Student',
@@ -170,10 +168,10 @@ try {
     };
 
     $generatedDate = date('m/d/Y H:i');
-    $lastCol = chr(64 + count($headers));
-    $row = 1;
+    $lastCol       = chr(64 + count($headers));
+    $row           = 1;
 
-    // ── School name ──────────────────────────────────────────────────────────
+    // ── School name ───────────────────────────────────────────────────────────
     $sheet->setCellValue("A{$row}", 'FIRST CITY PROVIDENTIAL COLLEGE');
     $sheet->mergeCells("A{$row}:{$lastCol}{$row}");
     $sheet->getStyle("A{$row}")->getFont()->setBold(true)->setSize(14);
@@ -226,14 +224,12 @@ try {
         $sheet->setCellValue("{$colLetter}{$row}", $header);
 
         $style = $sheet->getStyle("{$colLetter}{$row}");
-        // FIX: use getColor()->setRGB() for font color, setRGB() for fill (no FF prefix)
         $style->getFont()->setBold(true)->setSize(11)->getColor()->setRGB('FFFFFF');
         $style->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setRGB('1F0063');
         $style->getAlignment()
               ->setHorizontal(Alignment::HORIZONTAL_CENTER)
               ->setVertical(Alignment::VERTICAL_CENTER)
               ->setWrapText(true);
-        // FIX: Border::BORDER_THIN instead of BorderStyle::THIN
         $style->getBorders()->getAllBorders()
               ->setBorderStyle(Border::BORDER_THIN)
               ->getColor()->setRGB('000000');
@@ -246,20 +242,20 @@ try {
         $isEvenRow = $dataIndex % 2 === 0;
 
         if ($exportType === 'students') {
-            $name = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
+            $name    = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
             $rowData = [
                 $record['student_number'],
-                $record['rfid_uid'] ?? '-',
+                $record['rfid_uid'] ?: '-',
                 $name,
                 $record['course'],
                 $record['year_level'],
                 $record['department'],
             ];
         } elseif ($exportType === 'employees') {
-            $name = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
+            $name    = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
             $rowData = [
                 $record['employee_number'],
-                $record['rfid_uid'] ?? '-',
+                $record['rfid_uid'] ?: '-',
                 $name,
                 $record['position'],
                 $record['department'],
@@ -298,7 +294,6 @@ try {
             $cellStyle->getAlignment()
                       ->setHorizontal(Alignment::HORIZONTAL_LEFT)
                       ->setVertical(Alignment::VERTICAL_CENTER);
-            // FIX: Border::BORDER_THIN + getColor()->setRGB()
             $cellStyle->getBorders()->getAllBorders()
                       ->setBorderStyle(Border::BORDER_THIN)
                       ->getColor()->setRGB('C0C0C0');
@@ -332,7 +327,8 @@ try {
     exit;
 
 } catch (Exception $e) {
+    error_log('Export failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Export failed: ' . $e->getMessage()]);
+    echo json_encode(['success' => false, 'message' => 'Export failed. Please try again.']);
     exit;
 }
