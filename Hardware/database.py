@@ -528,3 +528,37 @@ class DatabaseManager:
         finally:
             cursor.close()
             connection.close()
+
+    def save_rfid_uid_to_buffer(self, rfid_uid: str):
+        normalized_uid = self.normalize_uid(rfid_uid)
+        now = self.current_datetime()
+
+        connection = self.get_connection()
+
+        try:
+            cursor = connection.cursor(dictionary=True)
+
+            cursor.execute(
+                """
+                INSERT INTO rfid_uid_buffer (
+                    rfid_uid,
+                    is_used,
+                    created_at
+                )
+                VALUES (%s, 0, %s)
+                """,
+                (
+                    normalized_uid,
+                    now,
+                ),
+            )
+
+            connection.commit()
+
+        except Error as error:
+            connection.rollback()
+            raise RuntimeError(f"Failed to save RFID UID to buffer: {error}")
+
+        finally:
+            cursor.close()
+            connection.close()

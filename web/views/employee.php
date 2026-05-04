@@ -369,6 +369,119 @@ require_once __DIR__ . '/../api/csrf.php';
 <div id="appToast" class="app-toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="assets/js/script.js"></script>
+<script src="assets/js/script.js?v=<?= time(); ?>"></script>
+
+<script>
+let employeeRfidPollingTimer = null;
+let latestEmployeeRfidBufferId = 0;
+const EMPLOYEE_RFID_FETCH_INTERVAL_MS = 5000;
+
+function getAddEmployeeRfidInput() {
+  return document.getElementById("addEmployeeRfid");
+}
+
+function startEmployeeRfidAutoFetch() {
+  const rfidInput = getAddEmployeeRfidInput();
+
+  if (!rfidInput) {
+    console.error("Employee RFID UID input field was not found.");
+    return;
+  }
+
+  console.log("Employee RFID auto-fetch started.");
+
+  rfidInput.value = "";
+  rfidInput.placeholder = "Tap RFID card now...";
+  rfidInput.readOnly = true;
+
+  stopEmployeeRfidAutoFetch();
+
+  employeeRfidPollingTimer = setInterval(fetchLatestEmployeeRfidUid, EMPLOYEE_RFID_FETCH_INTERVAL_MS);
+  fetchLatestEmployeeRfidUid();
+}
+
+function stopEmployeeRfidAutoFetch() {
+  if (employeeRfidPollingTimer !== null) {
+    clearInterval(employeeRfidPollingTimer);
+    employeeRfidPollingTimer = null;
+    console.log("Employee RFID auto-fetch stopped.");
+  }
+}
+
+function fetchLatestEmployeeRfidUid() {
+  const rfidInput = getAddEmployeeRfidInput();
+
+  if (!rfidInput) {
+    return;
+  }
+
+  fetch("../api/students.php?action=latest-rfid&last_id=" + latestEmployeeRfidBufferId + "&t=" + Date.now(), {
+    method: "GET",
+    headers: {
+      "Accept": "application/json"
+    },
+    cache: "no-store"
+  })
+    .then(function (response) {
+      if (!response.ok) {
+        throw new Error("HTTP error: " + response.status);
+      }
+
+      return response.json();
+    })
+    .then(function (data) {
+      console.log("Employee RFID API response:", data);
+
+      if (data.success && data.rfid_uid) {
+        latestEmployeeRfidBufferId = Number(data.id) || latestEmployeeRfidBufferId;
+
+        rfidInput.value = data.rfid_uid;
+        rfidInput.placeholder = "RFID UID captured";
+
+        console.log("RFID UID inserted into Add Employee field:", data.rfid_uid);
+      }
+    })
+    .catch(function (error) {
+      console.error("Employee RFID fetch error:", error);
+    });
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const addEmployeeBtn = document.getElementById("addEmployeeBtn");
+  const addEmployeeModal = document.getElementById("addEmployeeModal");
+
+  if (addEmployeeBtn) {
+    addEmployeeBtn.addEventListener("click", function () {
+      setTimeout(startEmployeeRfidAutoFetch, 300);
+    });
+  }
+
+  const modalObserver = new MutationObserver(function () {
+    if (!addEmployeeModal) {
+      return;
+    }
+
+    const isOpen =
+      addEmployeeModal.classList.contains("show") ||
+      addEmployeeModal.classList.contains("active") ||
+      window.getComputedStyle(addEmployeeModal).display !== "none";
+
+    if (isOpen) {
+      startEmployeeRfidAutoFetch();
+    } else {
+      stopEmployeeRfidAutoFetch();
+    }
+  });
+
+  if (addEmployeeModal) {
+    modalObserver.observe(addEmployeeModal, {
+      attributes: true,
+      attributeFilter: ["class", "style"]
+    });
+  }
+
+  console.log("Employee RFID auto-fetch script ready.");
+});
+</script>
 </body>
 </html>

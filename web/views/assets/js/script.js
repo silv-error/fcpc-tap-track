@@ -1720,3 +1720,162 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 });
+// ============================================================
+// LIVE RFID UID AUTO-FETCH FOR ADD STUDENT MODAL
+// ============================================================
+
+(function () {
+  console.log("Live RFID auto-fetch script loaded.");
+
+  let rfidPollingTimer = null;
+  let latestRfidBufferId = 0;
+
+  const RFID_API_URL = "/fcpc-tap-track/web/api/students.php?action=latest-rfid";
+
+  function getRfidUidInput() {
+    return (
+      document.querySelector('input[name="rfid_uid"]') ||
+      document.getElementById("rfid_uid") ||
+      document.querySelector('input[placeholder="RFID UID"]') ||
+      document.querySelector('input[placeholder*="RFID"]')
+    );
+  }
+
+  function isAddStudentModalOpen() {
+    const rfidInput = getRfidUidInput();
+
+    if (!rfidInput) {
+      return false;
+    }
+
+    const modal =
+      rfidInput.closest(".modal") ||
+      rfidInput.closest("[role='dialog']") ||
+      rfidInput.closest("form") ||
+      rfidInput.closest("div");
+
+    if (!modal) {
+      return false;
+    }
+
+    const style = window.getComputedStyle(modal);
+
+    return (
+      style.display !== "none" &&
+      style.visibility !== "hidden" &&
+      style.opacity !== "0"
+    );
+  }
+
+  function startRfidAutoFetch() {
+    const rfidInput = getRfidUidInput();
+
+    if (!rfidInput) {
+      console.error("RFID UID input field was not found.");
+      return;
+    }
+
+    console.log("RFID auto-fetch started.");
+
+    rfidInput.readOnly = true;
+    rfidInput.placeholder = "Tap RFID card now...";
+
+    stopRfidAutoFetch();
+
+    rfidPollingTimer = setInterval(fetchLatestRfidUid, 700);
+    fetchLatestRfidUid();
+  }
+
+  function stopRfidAutoFetch() {
+    if (rfidPollingTimer !== null) {
+      clearInterval(rfidPollingTimer);
+      rfidPollingTimer = null;
+      console.log("RFID auto-fetch stopped.");
+    }
+  }
+
+  function fetchLatestRfidUid() {
+    const rfidInput = getRfidUidInput();
+
+    if (!rfidInput) {
+      console.error("RFID UID input field was not found while polling.");
+      return;
+    }
+
+    const url = RFID_API_URL + "&last_id=" + latestRfidBufferId + "&t=" + Date.now();
+
+    fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    })
+      .then(function (response) {
+        if (!response.ok) {
+          throw new Error("HTTP error: " + response.status);
+        }
+
+        return response.json();
+      })
+      .then(function (data) {
+        console.log("RFID API response:", data);
+
+        if (data.success && data.rfid_uid) {
+          latestRfidBufferId = Number(data.id) || latestRfidBufferId;
+
+          rfidInput.value = data.rfid_uid;
+          rfidInput.placeholder = "RFID UID captured";
+
+          console.log("RFID UID inserted into input:", data.rfid_uid);
+        }
+      })
+      .catch(function (error) {
+        console.error("RFID fetch error:", error);
+      });
+  }
+
+  function detectAddStudentModal() {
+    const rfidInput = getRfidUidInput();
+
+    if (rfidInput && rfidPollingTimer === null) {
+      startRfidAutoFetch();
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    console.log("RFID DOM listener ready.");
+
+    document.addEventListener("click", function (event) {
+      const target = event.target;
+      const clickedText = target.textContent ? target.textContent.trim() : "";
+
+      if (
+        clickedText.includes("Add Student") ||
+        target.closest("[data-open-add-student]") ||
+        target.closest("#openAddStudentModal")
+      ) {
+        setTimeout(startRfidAutoFetch, 300);
+      }
+
+      if (
+        clickedText.includes("Cancel") ||
+        clickedText.includes("Close") ||
+        target.closest("[data-close-add-student]") ||
+        target.closest("#closeAddStudentModal")
+      ) {
+        stopRfidAutoFetch();
+      }
+    });
+
+    setInterval(function () {
+      if (isAddStudentModalOpen()) {
+        detectAddStudentModal();
+      }
+    }, 1000);
+  });
+
+  window.startRfidAutoFetch = startRfidAutoFetch;
+  window.stopRfidAutoFetch = stopRfidAutoFetch;
+  window.fetchLatestRfidUid = fetchLatestRfidUid;
+})();
