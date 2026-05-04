@@ -1,9 +1,8 @@
-from pathlib import Path
-
-
-BASE_DIR = Path(__file__).resolve().parent
-
-DATABASE_PATH = BASE_DIR / "rfid_attendance.db"
+MYSQL_HOST = "localhost"
+MYSQL_USER = "root"
+MYSQL_PASSWORD = ""
+MYSQL_DATABASE = "rfid_attendance"
+MYSQL_PORT = 3306
 
 TAP_COOLDOWN_SECONDS = 3
 
