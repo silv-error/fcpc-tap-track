@@ -1,0 +1,219 @@
+<?php
+
+require_once __DIR__ . '/../config/session.php';
+session_start();
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
+}
+
+require_once __DIR__ . '/../api/csrf.php';
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Attendance | FCPC Attendance Tracker</title>
+  <script>
+    if (localStorage.getItem('sidebar-collapsed') === '1') {
+      document.documentElement.classList.add('sidebar-collapsed');
+    }
+  </script>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
+</head>
+<body>
+
+<!-- Page Transition Overlay -->
+<div class="page-transition-overlay" id="pageTransitionOverlay"></div>
+
+<div class="dashboard-layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <!-- User Info -->
+    <div class="sidebar-user">
+      <div class="sidebar-avatar">
+        <img src="images/default-logo.png" alt="Default Logo" />
+      </div>
+      <div class="sidebar-user-info">
+        <h3>User, Test</h3>
+        <p>Administrator</p>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="sidebar-nav">
+      <a href="users.php">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+        </svg>
+        Users
+      </a>
+      <a href="students.php">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L21 9l-9-6zm0 4.2L17.53 10 12 12.8 6.47 10 12 7.2zM7 12.7l5 2.73 5-2.73v3.16L12 18.6l-5-2.74v-3.16z"/>
+        </svg>
+        Students
+      </a>
+      <a href="employee.php">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4zm8-4h2v2h-2v2h-2v-2h-2v-2h2V8h2v2z"/>
+        </svg>
+        Employees
+      </a>
+      <a href="attendance.php" class="active">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/>
+        </svg>
+        Attendance
+      </a>
+    </nav>
+
+    <!-- Logout -->
+    <div class="sidebar-logout">
+      <button class="btn-logout" onclick="handleLogout()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Log out
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-content">
+
+    <!-- Top Header -->
+    <header class="top-header">
+      <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle menu">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+
+      <!-- FCPC Logo top-right -->
+      <div class="header-logo">
+        <img src="images/fcpc-logo.png" alt="FCPC Logo" height="36" />
+      </div>
+    </header>
+
+    <!-- Page Content -->
+    <main class="page-content">
+      <h1 class="page-title">Attendance</h1>
+      <hr class="page-divider" />
+
+      <div class="table-toolbar">
+        <!-- Filters -->
+        <div class="filters-row table-toolbar-filters">
+        <div class="filter-group">
+          <label for="searchInput">Search</label>
+          <input
+            type="text"
+            id="searchInput"
+            class="filter-input"
+            placeholder="Search by Name/ID"
+          />
+        </div>
+
+        <div class="filter-group">
+          <label for="typeSelect">Type</label>
+          <select id="typeSelect" class="filter-select">
+            <option value="all">All</option>
+            <option value="Student">Student</option>
+            <option value="Employee">Employee</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="dateInput">Date</label>
+          <input
+            type="date"
+            id="dateInput"
+            class="filter-input"
+            placeholder="MM/DD/YYYY"
+          />
+        </div>
+        </div>
+
+        <div class="table-toolbar-actions">
+          <button id="openExportBtn" class="toolbar-btn toolbar-btn-secondary" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 21V11"/>
+              <path d="m8.5 14.5 3.5-3.5 3.5 3.5"/>
+              <path d="M5 8.5V5h14v3.5"/>
+            </svg>
+            <span>Export</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-wrapper">
+        <table class="data-table" data-endpoint="../api/attendance.php" data-table-type="attendance">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Time In</th>
+              <th>Time Out</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination -->
+      <div class="pagination">
+        <button class="pg-btn" id="prevBtn" aria-label="Previous page" onclick="prevPage()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <div id="pageNumbers"></div>
+        <button class="pg-btn" id="nextBtn" aria-label="Next page" onclick="nextPage()">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+      </div>
+    </main>
+
+  </div><!-- end main-content -->
+</div><!-- end dashboard-layout -->
+
+<!-- Logout Modal -->
+<div id="logoutModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <h2 class="modal-title">This page says</h2>
+    <p class="modal-message">Are you sure you want to log out?</p>
+    <div class="modal-buttons">
+      <button id="logoutConfirm" class="modal-btn modal-btn-confirm">OK</button>
+      <button id="logoutCancel" class="modal-btn modal-btn-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="exportModal" class="modal">
+  <div class="modal-overlay" onclick="closeExportModal()"></div>
+  <div class="modal-content overview-modal-content export-modal-content">
+    <div id="exportModalTitle" class="overview-header">Export Attendance Records</div>
+    <div id="exportModalBody" class="export-modal-body"></div>
+    <div class="export-modal-actions">
+      <button type="button" class="overview-back-btn overview-cancel-btn" onclick="closeExportModal()">Cancel</button>
+      <button type="button" class="overview-back-btn" onclick="handleExport()">Export</button>
+    </div>
+  </div>
+</div>
+
+<div id="appToast" class="app-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="assets/js/script.js"></script>
+</body>
+</html>
