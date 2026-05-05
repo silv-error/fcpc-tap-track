@@ -115,7 +115,7 @@ require_once __DIR__ . '/../api/csrf.php';
           </div>
           <div class="filter-group">
             <label for="departmentSelect">Department</label>
-            <select id="departmentSelect" class="filter-select">
+            <select id="departmentSelect" class="filter-select filter-select-department">
               <option value="all">All Departments</option>
             </select>
           </div>
@@ -359,9 +359,31 @@ require_once __DIR__ . '/../api/csrf.php';
         <label for="addStudentNumber">Student No.:<span class="field-required">*</span></label>
         <input id="addStudentNumber" type="text" class="edit-input-active" placeholder="Student No." />
       </div>
-      <div class="overview-field">
+      <div class="overview-field overview-field-full">
+        <label for="addStudentDepartment">Department:<span class="field-required">*</span></label>
+        <select id="addStudentDepartment" class="edit-input-active overview-select">
+            <option value="">Select Department</option>
+            <option value="Basic Education">Basic Education</option>
+            <option value="Senior High School (Academic)">Senior High School (Academic)</option>
+            <option value="Senior High School (Technical-Vocational)">Senior High School (Technical-Vocational)</option>
+            <option value="Senior High School (Information and Communication Technology)">Senior High School (Information and Communication Technology)</option>
+            <option value="Senior High School (Agriculture and Fishery Arts)">Senior High School (Agriculture and Fishery Arts)</option>
+            <option value="Senior High School (Arts and Design)">Senior High School (Arts and Design)</option>
+            <option value="College of Accountancy">College of Accountancy</option>
+            <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+            <option value="College of Business Management">College of Business Management</option>
+            <option value="College of Criminal Justice">College of Criminal Justice</option>
+            <option value="College of Education">College of Education</option>
+            <option value="College of Computer Studies">College of Computer Studies</option>
+            <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+            <option value="College of Engineering">College of Engineering</option>
+          </select>
+      </div>
+      <div class="overview-field overview-field-full">
         <label for="addStudentCourse">Course:<span class="field-required">*</span></label>
-        <input id="addStudentCourse" type="text" class="edit-input-active" placeholder="e.g. BSIT" />
+        <select id="addStudentCourse" class="edit-input-active overview-select" disabled>
+            <option value="">Select Course</option>
+          </select>
       </div>
       <div class="overview-field">
         <label for="addStudentYearLevel">Year Level:<span class="field-required">*</span></label>
@@ -372,10 +394,6 @@ require_once __DIR__ . '/../api/csrf.php';
             <option value="3rd Year">3rd Year</option>
             <option value="4th Year">4th Year</option>
           </select>
-      </div>
-      <div class="overview-field overview-field-full">
-        <label for="addStudentDepartment">Department:<span class="field-required">*</span></label>
-        <input id="addStudentDepartment" type="text" class="edit-input-active" placeholder="Department" />
       </div>
       <div class="overview-field overview-field-full">
         <label for="addStudentRfid">RFID UID:</label>

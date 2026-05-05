@@ -34,6 +34,19 @@ function formatTime(value) {
   return String(value).slice(0, 5);
 }
 
+function formatLongDate(value) {
+  if (!value || value === '-') return '-';
+  try {
+    const date = new Date(value);
+    const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+    const dateStr = date.toLocaleDateString('en-US', dateOptions);
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr} ${timeStr}`;
+  } catch {
+    return String(value);
+  }
+}
+
 function parseNameParts(record) {
   if (!record) {
     return { lastName: '-', firstName: '-', middleName: '-' };
@@ -299,6 +312,23 @@ function updatePagination(totalPages) {
   renderPageNumbers(totalPages);
 }
 
+function triggerPaginationTransition() {
+  const table = tableState.table;
+  if (!table) return;
+
+  const wrapper = table.closest('.table-wrapper');
+  if (!wrapper) return;
+
+  wrapper.classList.remove('pagination-transition');
+  void wrapper.offsetWidth;
+  wrapper.classList.add('pagination-transition');
+
+  window.clearTimeout(triggerPaginationTransition._timer);
+  triggerPaginationTransition._timer = window.setTimeout(() => {
+    wrapper.classList.remove('pagination-transition');
+  }, 240);
+}
+
 function renderCurrentPage() {
   const table = tableState.table;
   if (!table) return;
@@ -392,12 +422,38 @@ function renderCurrentPage() {
   updatePagination(totalPages);
 }
 
-function populateDepartmentSelect(rows) {
+function populateDepartmentSelect() {
   const departmentSelect = document.getElementById('departmentSelect');
   if (!departmentSelect) return;
 
   const existingValue = departmentSelect.value || 'all';
-  const departments = [...new Set(rows.map((row) => row.department).filter(Boolean))].sort();
+  const studentDepartments = [
+    'College of Accountancy',
+    'College of Allied Medical Sciences',
+    'College of Business Management',
+    'College of Criminal Justice',
+    'College of Education',
+    'College of Computer Studies',
+    'College of Arts and Sciences',
+    'College of Engineering',
+    'Basic Education',
+    'Senior High School (Academic)',
+    'Senior High School (Technical-Vocational)',
+    'Senior High School (Information and Communication Technology)',
+    'Senior High School (Agriculture and Fishery Arts)',
+    'Senior High School (Arts and Design)',
+  ];
+  const employeeDepartments = [
+    'College of Accountancy',
+    'College of Allied Medical Sciences',
+    'College of Business Management',
+    'College of Criminal Justice',
+    'College of Education',
+    'College of Computer Studies',
+    'College of Arts and Sciences',
+    'College of Engineering',
+  ];
+  const departments = tableState.pageType === 'students' ? studentDepartments : employeeDepartments;
 
   departmentSelect.innerHTML = '<option value="all">All Departments</option>';
   departments.forEach((department) => {
@@ -558,7 +614,7 @@ async function loadTableData() {
     tableState.filteredRows = tableState.rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
-      populateDepartmentSelect(rows);
+      populateDepartmentSelect();
     }
 
     if (tableState.pageType === 'students') {
@@ -584,6 +640,7 @@ function goToPage(pageNum) {
   const totalPages = Math.max(1, Math.ceil(tableState.filteredRows.length / rowsPerPage));
   if (pageNum < 1 || pageNum > totalPages) return;
   tableState.currentPage = pageNum;
+  triggerPaginationTransition();
   renderCurrentPage();
 }
 
@@ -890,9 +947,13 @@ function getExportModalBody(pageType, rows) {
         <div class="export-field export-field-full">
           <label>Year Level</label>
           <div class="export-checkbox-row">
+            <label class="export-checkbox">
+              <input type="checkbox" id="exportYearLevelAll" class="export-year-level-all" />
+              <span>All</span>
+            </label>
             ${['1st Year', '2nd Year', '3rd Year', '4th Year'].map((level) => `
               <label class="export-checkbox">
-                <input type="checkbox" name="exportYearLevel" value="${level}" />
+                <input type="checkbox" name="exportYearLevel" value="${level}" class="export-year-level-item" />
                 <span>${level}</span>
               </label>
             `).join('')}
@@ -1068,12 +1129,17 @@ function collectExportRows(pageType) {
     if (pageType === 'students') {
       const departmentVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
       const courseVal = (document.getElementById('exportCourseSelect')?.value || 'all').toLowerCase();
-      const yearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value.toLowerCase());
+      const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
+      const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value.toLowerCase());
       const yearLevelValue = (model.yearLevel || '').toLowerCase();
 
       if (departmentVal !== 'all' && model.department.toLowerCase() !== departmentVal) return false;
       if (courseVal !== 'all' && model.course.toLowerCase() !== courseVal) return false;
-      if (yearLevels.length && !yearLevels.includes(yearLevelValue)) return false;
+      
+      // If "All" is checked, skip year level filter; otherwise filter by selected year levels
+      if (!allYearLevels && selectedYearLevels.length > 0 && !selectedYearLevels.includes(yearLevelValue)) {
+        return false;
+      }
     }
 
     if (pageType === 'employees') {
@@ -1123,7 +1189,10 @@ async function handleExport() {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
     filters.course = document.getElementById('exportCourseSelect')?.value || 'all';
-    filters.yearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
+    const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
+    const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
+    filters.yearLevels = allYearLevels ? [] : selectedYearLevels;
+    filters.allYearLevels = allYearLevels;
   } else if (pageType === 'employees') {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
@@ -1140,7 +1209,7 @@ async function handleExport() {
   formData.append('filters', JSON.stringify(filters));
 
   try {
-    const response = await fetch('../../api/export.php', {
+    const response = await fetch('../api/export.php', {
       method: 'POST',
       body: formData,
     });
@@ -1221,7 +1290,7 @@ async function reloadTable() {
     tableState.filteredRows = tableState.rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
-      populateDepartmentSelect(rows);
+      populateDepartmentSelect();
     }
 
     if (tableState.pageType === 'students') {
@@ -1242,11 +1311,11 @@ function isModalOpen() {
 }
 
 function startRealtimeTableRefresh() {
-  if (!tableState.table || !tableState.pageType || tableState.pageType === 'generic') {
+  if (!tableState.table || tableState.pageType !== 'attendance') {
     return;
   }
 
-  const refreshMs = tableState.pageType === 'attendance' ? 2000 : 5000;
+  const refreshMs = 1000;
 
   stopRealtimeTableRefresh();
 
@@ -1296,8 +1365,8 @@ function openViewUserModal(record) {
   setValue('viewUserEmail', record.email);
   setValue('viewUserRole', record.role);
   setValue('viewUserStatus', record.is_active ? 'Active' : 'Inactive');
-  setText('viewUserCreatedAt', record.created_at || '-');
-  setText('viewUserUpdatedAt', record.updated_at || '-');
+  setText('viewUserCreatedAt', formatLongDate(record.created_at));
+  setText('viewUserUpdatedAt', formatLongDate(record.updated_at));
 
   modal.classList.add('show');
 }
@@ -1383,6 +1452,129 @@ if (typeof saveAddUser === 'undefined') {
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
+// Department to Courses Mapping for Add Student Modal
+const departmentCoursesMap = {
+  'Basic Education': [
+    'Kindergarten',
+    'Elementary',
+    'Junior High School (With STE Programs)',
+    'Senior High School',
+  ],
+  'Senior High School (Academic)': [
+    'General Academic Strand (GAS)',
+    'Accountancy, Business and Management (ABM)',
+    'Humanities and Social Sciences Strand (HUMSS)',
+    'Science, Technology, Engineering, and Mathematics Strand (STEM)',
+  ],
+  'Senior High School (Technical-Vocational)': [
+    'Home Economics',
+    'Tourism Promotion Services (NC II)',
+    'Front Office Services (NC II)',
+    'Beauty/Nail Care (NC II)',
+    'Bread and Pastry Production (NC II)',
+    'Food and Beverage Services (NC II)',
+    'Hair Dressing (NC II)',
+    'Cookery (NC II)',
+    'Commercial Cooking (NC II)',
+    'Caregiving (NC II)',
+  ],
+  'Senior High School (Information and Communication Technology)': [
+    'Contact Center Services (NC II)',
+    'Computer Hardware Servicing (NC II)',
+    'Technical Drafting (NC II)',
+  ],
+  'Senior High School (Agriculture and Fishery Arts)': [
+    'Crop Production (NC II)',
+    'Organic Agriculture (NC II)',
+  ],
+  'Senior High School (Arts and Design)': [
+    'Performing Arts',
+    'Visual Arts',
+  ],
+  'College of Accountancy': [
+    'Bachelor of Science in Accountancy',
+    'Bachelor of Science in Management Accounting',
+    'Bachelor of Science in Accounting Information System',
+    'Bachelor of Science in Internal Auditing',
+  ],
+  'College of Allied Medical Sciences': [
+    'Bachelor of Science in Nursing',
+    'Bachelor of Science in Midwifery',
+  ],
+  'College of Business Management': [
+    'Bachelor of Science in Hospitality Management',
+    'Bachelor of Science in Tourism Management',
+    'Bachelor of Science in Office Management',
+    'Bachelor of Science in Business Administration Major in Finance Management',
+    'Bachelor of Science in Business Administration Major in Marketing Management',
+  ],
+  'College of Criminal Justice': [
+    'Bachelor of Science in Criminology',
+  ],
+  'College of Education': [
+    'Bachelor of Elementary Education',
+    'Bachelor of Secondary Education Major in: English, Science, Mathematics, Social Studies, Values Education, and Filipino',
+    'Certificate in Teaching Education',
+    'Bachelor of Physical Education',
+    'Bachelor of Technology & Livelihood Education',
+  ],
+  'College of Computer Studies': [
+    'Bachelor of Science in Information Technology with CISCO Certification program',
+    'Bachelor of Science in Information Technology with specialization in Software Engineering',
+    'Bachelor of Science in Information Technology with specialization in Cybersecurity',
+    'Bachelor of Science in Computer Science',
+  ],
+  'College of Arts and Sciences': [
+    'Bachelor or Arts in Communication',
+    'Bachelor of Science in Biology',
+    'Bachelor of Science in Psychology',
+    'Bachelor or Arts in Psychology',
+  ],
+  'College of Engineering': [
+    'Bachelor of Science in Civil Engineering',
+  ],
+};
+
+// Update course options based on selected department
+function updateCourseOptionsForAddStudent() {
+  const departmentSelect = document.getElementById('addStudentDepartment');
+  const courseSelect = document.getElementById('addStudentCourse');
+
+  if (!departmentSelect || !courseSelect) return;
+
+  const selectedDepartment = departmentSelect.value;
+  const courses = departmentCoursesMap[selectedDepartment] || [];
+
+  // Clear and disable course select if no department is selected
+  if (!selectedDepartment) {
+    courseSelect.innerHTML = '<option value="">Select Course</option>';
+    courseSelect.disabled = true;
+    courseSelect.classList.add('disabled');
+    return;
+  }
+
+  // Enable course select and populate with filtered courses
+  courseSelect.disabled = false;
+  courseSelect.classList.remove('disabled');
+  courseSelect.innerHTML = '<option value="">Select Course</option>';
+
+  courses.forEach((course) => {
+    const option = document.createElement('option');
+    option.value = course;
+    option.textContent = course;
+    courseSelect.appendChild(option);
+  });
+}
+
+// Initialize course filtering when Add Student Modal is opened
+function initAddStudentModalCourseFiltering() {
+  const departmentSelect = document.getElementById('addStudentDepartment');
+
+  if (departmentSelect) {
+    departmentSelect.addEventListener('change', updateCourseOptionsForAddStudent);
+  }
+}
+
 function openViewStudentModal(record) {
   const modal = document.getElementById('viewStudentModal');
   if (!modal) return;
@@ -1399,8 +1591,8 @@ function openViewStudentModal(record) {
   setValue('viewStudentYearLevel',  record.year_level);
   setValue('viewStudentDepartment', record.department);
   setValue('viewStudentRfid',       record.rfid_uid);
-  setText('viewStudentCreatedAt',   record.created_at || '-');
-  setText('viewStudentUpdatedAt',   record.updated_at || '-');
+  setText('viewStudentCreatedAt',   formatLongDate(record.created_at));
+  setText('viewStudentUpdatedAt',   formatLongDate(record.updated_at));
 
   modal.classList.add('show');
 }
@@ -1456,6 +1648,19 @@ function openAddStudentModal() {
   const modal = document.getElementById('addStudentModal');
   if (!modal) return;
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.querySelectorAll('select').forEach((el) => (el.value = ''));
+  
+  // Reset course field to disabled state
+  const courseSelect = document.getElementById('addStudentCourse');
+  if (courseSelect) {
+    courseSelect.disabled = true;
+    courseSelect.classList.add('disabled');
+    courseSelect.innerHTML = '<option value="">Select Course</option>';
+  }
+  
+  // Initialize course filtering event listener
+  initAddStudentModalCourseFiltering();
+  
   modal.classList.add('show');
 }
 
@@ -1511,8 +1716,8 @@ function openViewEmployeeModal(record) {
   setValue('viewEmployeeDepartment', record.department);
   setValue('viewEmployeePosition',   record.position);
   setValue('viewEmployeeRfid',       record.rfid_uid);
-  setText('viewEmployeeCreatedAt',   record.created_at || '-');
-  setText('viewEmployeeUpdatedAt',   record.updated_at || '-');
+  setText('viewEmployeeCreatedAt',   formatLongDate(record.created_at));
+  setText('viewEmployeeUpdatedAt',   formatLongDate(record.updated_at));
 
   modal.classList.add('show');
 }
@@ -1567,6 +1772,7 @@ function openAddEmployeeModal() {
   const modal = document.getElementById('addEmployeeModal');
   if (!modal) return;
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.querySelectorAll('select').forEach((el) => (el.value = ''));
   modal.classList.add('show');
 }
 

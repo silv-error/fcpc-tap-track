@@ -57,7 +57,7 @@ try {
             $data = array_filter($data, fn($row) => strtolower($row['course']) === $course);
         }
 
-        if (!empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
+        if (!($filters['allYearLevels'] ?? false) && !empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
             $levels = array_map('strtolower', $filters['yearLevels']);
             $data = array_filter($data, fn($row) => in_array(strtolower($row['year_level']), $levels, true));
         }

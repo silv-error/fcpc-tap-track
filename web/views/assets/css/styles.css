@@ -56,6 +56,21 @@
   flex-wrap: nowrap;
 }
 
+.table-wrapper.pagination-transition .data-table tbody {
+  animation: paginationFade 0.24s ease;
+}
+
+@keyframes paginationFade {
+  0% {
+    opacity: 0.45;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 #pageNumbers {
   display: flex;
   align-items: center;
@@ -803,6 +818,11 @@ body {
   border-color: #3f3f9f;
 }
 
+.filter-select-department {
+  width: 250px;
+  min-width: 220px;
+}
+
 .date-wrapper {
   position: relative;
 }
@@ -1334,9 +1354,9 @@ body {
 }
 
 .export-select {
-  appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
+  appearance: none;
   padding-right: 34px;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
@@ -1701,4 +1721,19 @@ body {
   color: #222;
   background-size: 12px 12px;
   padding-right: 32px;
+}
+
+/* Disabled state for select elements */
+.overview-select:disabled,
+.overview-select.disabled {
+  background-color: #e8e8e8 !important;
+  color: #999 !important;
+  cursor: not-allowed !important;
+  border-color: #d0d0d0 !important;
+  opacity: 0.6;
+}
+
+.overview-select:disabled option,
+.overview-select.disabled option {
+  color: #999;
 }
