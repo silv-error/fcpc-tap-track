@@ -18,6 +18,10 @@ require_once __DIR__ . '/../api/csrf.php';
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Users | FCPC Attendance Tracker</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="apple-touch-icon" href="images/favicon.ico" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>

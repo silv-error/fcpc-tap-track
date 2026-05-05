@@ -823,6 +823,12 @@ body {
   min-width: 220px;
 }
 
+.filter-select-course {
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+}
+
 .date-wrapper {
   position: relative;
 }

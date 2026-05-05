@@ -23,6 +23,10 @@ require_once __DIR__ . '/../api/csrf.php';
     }
   </script>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="apple-touch-icon" href="images/favicon.ico" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
@@ -117,6 +121,20 @@ require_once __DIR__ . '/../api/csrf.php';
             <label for="departmentSelect">Department</label>
             <select id="departmentSelect" class="filter-select filter-select-department">
               <option value="all">All Departments</option>
+              <option value="College of Accountancy">College of Accountancy</option>
+              <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+              <option value="College of Business Management">College of Business Management</option>
+              <option value="College of Criminal Justice">College of Criminal Justice</option>
+              <option value="College of Education">College of Education</option>
+              <option value="College of Computer Studies">College of Computer Studies</option>
+              <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+              <option value="College of Engineering">College of Engineering</option>
+              <option value="Basic Education">Basic Education</option>
+              <option value="Senior High School (Academic)">Senior High School (Academic)</option>
+              <option value="Senior High School (Technical-Vocational)">Senior High School (Technical-Vocational)</option>
+              <option value="Senior High School (Information and Communication Technology)">Senior High School (Information and Communication Technology)</option>
+              <option value="Senior High School (Agriculture and Fishery Arts)">Senior High School (Agriculture and Fishery Arts)</option>
+              <option value="Senior High School (Arts and Design)">Senior High School (Arts and Design)</option>
             </select>
           </div>
           <div class="filter-group">
@@ -127,7 +145,7 @@ require_once __DIR__ . '/../api/csrf.php';
           </div>
           <div class="filter-group">
             <label for="courseSelect">Course</label>
-            <select id="courseSelect" class="filter-select">
+            <select id="courseSelect" class="filter-select filter-select-course">
               <option value="all">All Courses</option>
             </select>
           </div>
@@ -389,6 +407,18 @@ require_once __DIR__ . '/../api/csrf.php';
         <label for="addStudentYearLevel">Year Level:<span class="field-required">*</span></label>
         <select id="addStudentYearLevel" class="edit-input-active overview-select">
             <option value="">Select Year Level</option>
+            <option value="Grade 1">Grade 1</option>
+            <option value="Grade 2">Grade 2</option>
+            <option value="Grade 3">Grade 3</option>
+            <option value="Grade 4">Grade 4</option>
+            <option value="Grade 5">Grade 5</option>
+            <option value="Grade 6">Grade 6</option>
+            <option value="Grade 7">Grade 7</option>
+            <option value="Grade 8">Grade 8</option>
+            <option value="Grade 9">Grade 9</option>
+            <option value="Grade 10">Grade 10</option>
+            <option value="Grade 11">Grade 11</option>
+            <option value="Grade 12">Grade 12</option>
             <option value="1st Year">1st Year</option>
             <option value="2nd Year">2nd Year</option>
             <option value="3rd Year">3rd Year</option>
