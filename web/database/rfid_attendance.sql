@@ -1,7 +1,11 @@
--- Fixed SQL dump for direct import
--- Adds database creation, disables foreign key checks during import,
--- and ensures FK on `users.employee_id` is created after referenced indexes.
--- Generated: May 04, 2026
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Apr 28, 2026 at 09:19 AM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -13,12 +17,11 @@ SET time_zone = "+00:00";
 /*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
 /*!40101 SET NAMES utf8mb4 */;
 
--- Create database and select it
-CREATE DATABASE IF NOT EXISTS `rfid_attendance` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
-USE `rfid_attendance`;
+--
+-- Database: `rfid_attendance`
+--
 
--- Disable foreign key checks for safe import ordering
-SET FOREIGN_KEY_CHECKS=0;
+-- --------------------------------------------------------
 
 --
 -- Table structure for table `attendance_logs`
@@ -100,32 +103,32 @@ CREATE TABLE `rfid_scan_logs` (
 --
 
 CREATE TABLE `students` (
-  `id`             int(11)       NOT NULL AUTO_INCREMENT,
-  `student_number` varchar(50)   NOT NULL,
-  `category`       varchar(50)   DEFAULT NULL,
-  `last_name`      varchar(100)  NOT NULL,
-  `first_name`     varchar(100)  NOT NULL,
-  `middle_name`    varchar(100)  DEFAULT NULL,
-  `suffix`         varchar(10)   DEFAULT NULL,
-  `program`         varchar(100)  DEFAULT NULL,
-  `year_level`     varchar(50)   DEFAULT NULL,
-  `strand`         varchar(150)  DEFAULT NULL,
-  `department`     varchar(100)  DEFAULT NULL,
-  `rfid_uid`       varchar(255)  DEFAULT NULL,
-  `is_active`      tinyint(1)    NOT NULL DEFAULT 1,
-  `created_at`     datetime      DEFAULT current_timestamp(),
-  `updated_at`     datetime      DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `student_number` (`student_number`),
-  UNIQUE KEY `rfid_uid` (`rfid_uid`)
+  `id` int(11) NOT NULL,
+  `student_number` varchar(50) NOT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `suffix` varchar(10) DEFAULT NULL,
+  `category` varchar(50) DEFAULT NULL,
+  `program` varchar(100) DEFAULT NULL,
+  `year_level` varchar(50) DEFAULT NULL,
+  `strand` varchar(100) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `rfid_uid` varchar(100) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE `students` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
 
 --
 -- Dumping data for table `students`
 --
-INSERT INTO `students` (`id`, `student_number`, `category`, `last_name`, `first_name`, `middle_name`, `suffix`, `program`, `year_level`, `strand`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, '2024-0001', 'Tertiary', 'Santos', 'Maria', 'Clara', NULL, 'BSIT', '2nd Year', NULL, 'CICS', 'A1B2C3D4', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03'),
-(2, '2024-0002', 'Tertiary', 'Reyes', 'Juan', 'Luna', NULL, 'BSCS', '1st Year', NULL, 'CICS', 'E5F6G7H8', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03');
+
+INSERT INTO `students` (`id`, `student_number`, `last_name`, `first_name`, `middle_name`, `suffix`, `category`, `program`, `year_level`, `strand`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, '2024-0001', 'Santos', 'Maria', 'Clara', NULL, 'Tertiary', 'BSIT', '2nd Year', NULL, 'CICS', 'A1B2C3D4', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03'),
+(2, '2024-0002', 'Reyes', 'Juan', 'Luna', NULL, 'Tertiary', 'BSCS', '1st Year', NULL, 'CICS', 'E5F6G7H8', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03');
 
 -- --------------------------------------------------------
 
@@ -148,16 +151,12 @@ CREATE TABLE `users` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Add employee_id column now; create FK later after indexes exist
 ALTER TABLE users ADD COLUMN employee_id INT NULL AFTER id;
+ALTER TABLE users ADD CONSTRAINT fk_users_employee FOREIGN KEY (employee_id) REFERENCES employees(id);
 
 --
 -- Dumping data for table `users`
 --
-
-INSERT INTO `users` (`id`, `username`, `last_name`, `first_name`, `middle_name`, `suffix`, `email`, `password_hash`, `role`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'supadmin', 'Doe', 'Jane', 'Smith', NULL, 'supadmin@gmail.com', 'hash_pw_123', 'Superadmin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04'),
-(2, 'admin', 'Brown', 'Robert', NULL, NULL, 'admin@gmail.com', 'hash_pw_456', 'Admin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04');
 
 --
 -- Indexes for dumped tables
@@ -245,16 +244,7 @@ ALTER TABLE `users`
 ALTER TABLE `attendance_logs`
   ADD CONSTRAINT `attendance_logs_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `attendance_logs_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE SET NULL;
-
---
--- Constraints for table `users` (create after employees and users indexes exist)
---
-ALTER TABLE `users`
-  ADD CONSTRAINT `fk_users_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
 COMMIT;
-
--- Re-enable foreign key checks after import
-SET FOREIGN_KEY_CHECKS=1;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;

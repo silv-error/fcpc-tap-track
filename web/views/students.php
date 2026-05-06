@@ -118,6 +118,15 @@ require_once __DIR__ . '/../api/csrf.php';
             />
           </div>
           <div class="filter-group">
+            <label for="categorySelect">Category</label>
+            <select id="categorySelect" class="filter-select">
+              <option value="all">All</option>
+              <option value="Basic Education">Basic Education</option>
+              <option value="Tertiary">Tertiary</option>
+              <option value="Graduate School">Graduate School</option>
+            </select>
+          </div>
+          <div class="filter-group">
             <label for="departmentSelect">Department</label>
             <select id="departmentSelect" class="filter-select">
               <option value="all">All Departments</option>
@@ -163,7 +172,7 @@ require_once __DIR__ . '/../api/csrf.php';
             <tr>
               <th>Student No.</th>
               <th>RFID UID</th>
-              <th>Name</th>
+              <th>Full Name</th>
               <th>Program</th>
               <th>Year Level</th>
               <th>Department</th>
@@ -224,12 +233,20 @@ require_once __DIR__ . '/../api/csrf.php';
         <input id="viewStudentNumber" type="text" readonly />
       </div>
       <div class="overview-field">
+        <label for="viewStudentCategory">Category:</label>
+        <input id="viewStudentCategory" type="text" readonly />
+      </div>
+      <div class="overview-field">
         <label for="viewStudentProgram">Program:</label>
         <input id="viewStudentProgram" type="text" readonly />
       </div>
       <div class="overview-field">
         <label for="viewStudentYearLevel">Year Level:</label>
         <input id="viewStudentYearLevel" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="viewStudentStrand">Strand:</label>
+        <input id="viewStudentStrand" type="text" readonly />
       </div>
       <div class="overview-field overview-field-full">
         <label for="viewStudentDepartment">Department:</label>
@@ -313,12 +330,20 @@ require_once __DIR__ . '/../api/csrf.php';
         <input id="editStudentNumber" type="text" readonly />
       </div>
       <div class="overview-field">
+        <label for="editStudentCategory">Category:</label>
+        <input id="editStudentCategory" type="text" readonly />
+      </div>
+      <div class="overview-field">
         <label for="editStudentProgram">Program:</label>
         <input id="editStudentProgram" type="text" readonly />
       </div>
       <div class="overview-field">
         <label for="editStudentYearLevel">Year Level:</label>
         <input id="editStudentYearLevel" type="text" readonly />
+      </div>
+      <div class="overview-field">
+        <label for="editStudentStrand">Strand:</label>
+        <input id="editStudentStrand" type="text" readonly />
       </div>
       <div class="overview-field overview-field-full">
         <label for="editStudentDepartment">Department:</label>
@@ -343,6 +368,7 @@ require_once __DIR__ . '/../api/csrf.php';
   <div class="modal-content overview-modal-content">
     <div class="overview-header">Add Student</div>
     <div class="overview-grid">
+      <!-- Fixed Fields -->
       <div class="overview-field">
         <label for="addStudentFirstName">First Name:<span class="field-required">*</span></label>
         <input id="addStudentFirstName" type="text" class="edit-input-active" placeholder="First name" />
@@ -364,23 +390,87 @@ require_once __DIR__ . '/../api/csrf.php';
         <input id="addStudentNumber" type="text" class="edit-input-active" placeholder="Student No." />
       </div>
       <div class="overview-field">
-        <label for="addStudentProgram">Program:<span class="field-required">*</span></label>
-        <input id="addStudentProgram" type="text" class="edit-input-active" placeholder="e.g. BSIT" />
+        <label for="addStudentCategory">Category:<span class="field-required">*</span></label>
+        <select id="addStudentCategory" class="edit-input-active overview-select">
+          <option value="">Select Category</option>
+          <option value="Basic Education">Basic Education</option>
+          <option value="Tertiary">Tertiary</option>
+          <option value="Graduate School">Graduate School</option>
+        </select>
       </div>
-      <div class="overview-field">
-        <label for="addStudentYearLevel">Year Level:<span class="field-required">*</span></label>
-        <select id="addStudentYearLevel" class="edit-input-active overview-select">
+      
+      <!-- Basic Education Fields -->
+      <div id="addStudentBasicEducationFields" style="display: none;">
+        <div class="overview-field">
+          <label for="addStudentYearLevelBE">Year Level:</label>
+          <select id="addStudentYearLevelBE" class="edit-input-active overview-select">
+            <option value="">Select Year Level</option>
+            <option value="Pre-kinder 1">Pre-kinder 1</option>
+            <option value="Pre-kinder 2">Pre-kinder 2</option>
+            <option value="Kinder">Kinder</option>
+            <option value="Grade 1">Grade 1</option>
+            <option value="Grade 2">Grade 2</option>
+            <option value="Grade 3">Grade 3</option>
+            <option value="Grade 4">Grade 4</option>
+            <option value="Grade 5">Grade 5</option>
+            <option value="Grade 6">Grade 6</option>
+            <option value="Grade 7">Grade 7</option>
+            <option value="Grade 8">Grade 8</option>
+            <option value="Grade 9">Grade 9</option>
+            <option value="Grade 10">Grade 10</option>
+            <option value="Grade 11">Grade 11</option>
+            <option value="Grade 12">Grade 12</option>
+          </select>
+        </div>
+        <div id="addStudentStrandFieldsBE" style="display: none;">
+          <div class="overview-field">
+            <label for="addStudentStrandBE">Strand:</label>
+            <select id="addStudentStrandBE" class="edit-input-active overview-select">
+              <option value="">Select Strand</option>
+              <option value="General Academic Strand (GAS)">General Academic Strand (GAS)</option>
+              <option value="Accountancy, Business and Management (ABM)">Accountancy, Business and Management (ABM)</option>
+              <option value="Humanities and Social Sciences Strand (HUMSS)">Humanities and Social Sciences Strand (HUMSS)</option>
+              <option value="Science, Technology, Engineering, and Mathematics Strand (STEM)">Science, Technology, Engineering, and Mathematics Strand (STEM)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Tertiary Fields -->
+      <div id="addStudentTertiaryFields" style="display: none;">
+        <div class="overview-field">
+          <label for="addStudentDepartmentTertiary">Department:</label>
+          <input id="addStudentDepartmentTertiary" type="text" class="edit-input-active" placeholder="Department" />
+        </div>
+        <div class="overview-field">
+          <label for="addStudentProgramTertiary">Program:</label>
+          <input id="addStudentProgramTertiary" type="text" class="edit-input-active" placeholder="e.g. BSIT" />
+        </div>
+        <div class="overview-field">
+          <label for="addStudentYearLevelTertiary">Year Level:</label>
+          <select id="addStudentYearLevelTertiary" class="edit-input-active overview-select">
             <option value="">Select Year Level</option>
             <option value="1st Year">1st Year</option>
             <option value="2nd Year">2nd Year</option>
             <option value="3rd Year">3rd Year</option>
             <option value="4th Year">4th Year</option>
           </select>
+        </div>
       </div>
-      <div class="overview-field overview-field-full">
-        <label for="addStudentDepartment">Department:<span class="field-required">*</span></label>
-        <input id="addStudentDepartment" type="text" class="edit-input-active" placeholder="Department" />
+      
+      <!-- Graduate School Fields -->
+      <div id="addStudentGraduateFields" style="display: none;">
+        <div class="overview-field">
+          <label for="addStudentDepartmentGraduate">Department:</label>
+          <input id="addStudentDepartmentGraduate" type="text" class="edit-input-active" placeholder="Department" />
+        </div>
+        <div class="overview-field">
+          <label for="addStudentProgramGraduate">Program:</label>
+          <input id="addStudentProgramGraduate" type="text" class="edit-input-active" placeholder="e.g. Master of Science" />
+        </div>
       </div>
+      
+      <!-- RFID UID (always visible at end) -->
       <div class="overview-field overview-field-full">
         <label for="addStudentRfid">RFID UID:</label>
         <input
@@ -399,6 +489,7 @@ require_once __DIR__ . '/../api/csrf.php';
     </div>
   </div>
 </div>
+
 
 <div id="appToast" class="app-toast"></div>
 

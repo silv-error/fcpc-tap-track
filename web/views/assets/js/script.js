@@ -171,6 +171,7 @@ function buildRowModel(pageType, record) {
         department: escapeText(record.department),
         yearLevel: escapeText(record.year_level),
         program: escapeText(record.program),
+        category: escapeText(record.category),
         typeValue: '',
         dateValue: normalizeDate(record.created_at),
         record,
@@ -500,6 +501,46 @@ function populateYearLevelSelect(rows) {
   }
 }
 
+function populateCategorySelect(rows) {
+  const select = document.getElementById('categorySelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const categories = [...new Set(rows.map((row) => row.category).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Categories</option>';
+  categories.forEach((category) => {
+    const option = document.createElement('option');
+    option.value = category;
+    option.textContent = category;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((o) => o.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
+function populateStrandSelect(rows) {
+  const select = document.getElementById('strandSelect');
+  if (!select) return;
+
+  const existingValue = select.value || 'all';
+  const strands = [...new Set(rows.map((row) => row.strand).filter(Boolean))].sort();
+
+  select.innerHTML = '<option value="all">All Strands</option>';
+  strands.forEach((strand) => {
+    const option = document.createElement('option');
+    option.value = strand;
+    option.textContent = strand;
+    select.appendChild(option);
+  });
+
+  if ([...select.options].some((o) => o.value === existingValue)) {
+    select.value = existingValue;
+  }
+}
+
 function populateCourseSelect(rows) {
   const select = document.getElementById('programSelect');
   if (!select) return;
@@ -599,6 +640,7 @@ function applyFilters(resetToFirstPage = true) {
   const departmentSelect = document.getElementById('departmentSelect');
   const yearLevelSelect  = document.getElementById('yearLevelSelect');
   const programSelect     = document.getElementById('programSelect');
+  const categorySelect   = document.getElementById('categorySelect');
   const positionSelect   = document.getElementById('positionSelect');
 
   const searchVal     = (searchInput?.value      || '').trim().toLowerCase();
@@ -607,6 +649,7 @@ function applyFilters(resetToFirstPage = true) {
   const departmentVal = (departmentSelect?.value  || 'all').trim().toLowerCase();
   const yearLevelVal  = (yearLevelSelect?.value   || 'all').trim().toLowerCase();
   const programVal     = (programSelect?.value      || 'all').trim().toLowerCase();
+  const categoryVal   = (categorySelect?.value   || 'all').trim().toLowerCase();
   const positionVal   = (positionSelect?.value    || 'all').trim().toLowerCase();
 
   tableState.filteredRows = tableState.rows.filter((record) => {
@@ -618,6 +661,7 @@ function applyFilters(resetToFirstPage = true) {
       (!departmentVal || departmentVal === 'all' || model.department.toLowerCase() === departmentVal) &&
       (!yearLevelVal  || yearLevelVal  === 'all' || model.yearLevel?.toLowerCase()  === yearLevelVal) &&
       (!programVal     || programVal     === 'all' || model.program?.toLowerCase()     === programVal)    &&
+      (!categoryVal   || categoryVal   === 'all' || model.category?.toLowerCase()   === categoryVal)    &&
       (!positionVal   || positionVal   === 'all' || model.position?.toLowerCase()   === positionVal)
     );
   });
@@ -629,7 +673,7 @@ function applyFilters(resetToFirstPage = true) {
 }
 
 function bindAdditionalFilterControls() {
-  ['yearLevelSelect', 'programSelect', 'positionSelect'].forEach((id) => {
+  ['yearLevelSelect', 'programSelect', 'categorySelect', 'positionSelect'].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', () => {
       tableState.currentPage = 1;
       applyFilters();
@@ -1995,8 +2039,10 @@ function openViewStudentModal(record) {
   setValue('viewStudentFirstName',  parts.firstName);
   setValue('viewStudentMiddleName', parts.middleName);
   setValue('viewStudentNumber',     record.student_number);
+  setValue('viewStudentCategory',   record.category);
   setValue('viewStudentProgram',     record.program);
   setValue('viewStudentYearLevel',  record.year_level);
+  setValue('viewStudentStrand',     record.strand);
   setValue('viewStudentDepartment', record.department);
   setValue('viewStudentRfid',       record.rfid_uid);
   setText('viewStudentCreatedAt',   formatLongDate(record.created_at));
@@ -2020,8 +2066,10 @@ function openEditStudentModal(record) {
   setValue('editStudentMiddleName', parts.middleName);
   setValue('editStudentLastName',   parts.lastName);
   setValue('editStudentNumber',     record.student_number);
+  setValue('editStudentCategory',   record.category);
   setValue('editStudentProgram',     record.program);
   setValue('editStudentYearLevel',  record.year_level);
+  setValue('editStudentStrand',     record.strand);
   setValue('editStudentDepartment', record.department);
   setValue('editStudentRfid',       record.rfid_uid !== '-' ? record.rfid_uid : '');
 
@@ -2055,32 +2103,59 @@ async function saveEditStudent() {
 function openAddStudentModal() {
   const modal = document.getElementById('addStudentModal');
   if (!modal) return;
+  
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
   modal.querySelectorAll('select').forEach((el) => (el.value = ''));
   
-  // Reset program field to disabled state
-  const programSelect = document.getElementById('addStudentProgram');
-  if (programSelect) {
-    programSelect.disabled = true;
-    programSelect.classList.add('disabled');
-    programSelect.innerHTML = '<option value="">Select Program</option>';
+  // Hide all category-specific fields initially
+  document.getElementById('addStudentBasicEducationFields').style.display = 'none';
+  document.getElementById('addStudentTertiaryFields').style.display = 'none';
+  document.getElementById('addStudentGraduateFields').style.display = 'none';
+  document.getElementById('addStudentStrandFieldsBE').style.display = 'none';
+
+  // Add event listener for category changes
+  const categorySelect = document.getElementById('addStudentCategory');
+  if (categorySelect) {
+    categorySelect.addEventListener('change', handleAddStudentCategoryChange);
   }
 
-  // Reset year level to college defaults
-  const yearLevelSelect = document.getElementById('addStudentYearLevel');
-  if (yearLevelSelect) {
-    yearLevelSelect.disabled = false;
-    yearLevelSelect.classList.remove('disabled');
-  }
-  
-  // Initialize course filtering event listener
-  initAddStudentModalCourseFiltering();
-
-  // Set initial year level options (college defaults)
-  updateYearLevelOptionsForAddStudent();
-  
   modal.classList.add('show');
 }
+
+function handleAddStudentCategoryChange() {
+  const category = document.getElementById('addStudentCategory')?.value || '';
+  
+  // Hide all category-specific field groups
+  document.getElementById('addStudentBasicEducationFields').style.display = 'none';
+  document.getElementById('addStudentTertiaryFields').style.display = 'none';
+  document.getElementById('addStudentGraduateFields').style.display = 'none';
+  document.getElementById('addStudentStrandFieldsBE').style.display = 'none';
+  
+  // Show relevant fields based on category
+  if (category === 'Basic Education') {
+    document.getElementById('addStudentBasicEducationFields').style.display = 'block';
+  } else if (category === 'Tertiary') {
+    document.getElementById('addStudentTertiaryFields').style.display = 'block';
+  } else if (category === 'Graduate School') {
+    document.getElementById('addStudentGraduateFields').style.display = 'block';
+  }
+}
+
+// Handle year level change for Basic Education to show/hide strand field
+document.addEventListener('DOMContentLoaded', function() {
+  const yearLevelBE = document.getElementById('addStudentYearLevelBE');
+  if (yearLevelBE) {
+    yearLevelBE.addEventListener('change', function() {
+      const value = this.value;
+      const strandFields = document.getElementById('addStudentStrandFieldsBE');
+      if (value === 'Grade 11' || value === 'Grade 12') {
+        strandFields.style.display = 'block';
+      } else {
+        strandFields.style.display = 'none';
+      }
+    });
+  }
+});
 
 function closeAddStudentModal() {
   document.getElementById('addStudentModal')?.classList.remove('show');
@@ -2089,21 +2164,51 @@ function closeAddStudentModal() {
 async function saveAddStudent() {
   const get = (id) => document.getElementById(id)?.value.trim() || '';
 
+  const category = get('addStudentCategory');
+  
+  if (!category) {
+    showToast('Category is required.', 'error');
+    return;
+  }
+
   const body = {
     first_name:      get('addStudentFirstName'),
     middle_name:     get('addStudentMiddleName'),
     suffix:          get('addStudentSuffix'),
     last_name:       get('addStudentLastName'),
     student_number:  get('addStudentNumber'),
-    program:          get('addStudentProgram'),
-    year_level:      get('addStudentYearLevel'),
-    department:      get('addStudentDepartment'),
+    category:        category,
     rfid_uid:        get('addStudentRfid'),
   };
 
-  if (!body.first_name || !body.last_name || !body.student_number || !body.program || !body.year_level || !body.department) {
-    showToast('First name, last name, student number, program, year level, and department are required.', 'error');
+  if (!body.first_name || !body.last_name || !body.student_number) {
+    showToast('First name, last name, and student number are required.', 'error');
     return;
+  }
+
+  // Collect category-specific fields
+  if (category === 'Basic Education') {
+    body.year_level = get('addStudentYearLevelBE');
+    body.strand = get('addStudentStrandBE');
+    if (!body.year_level) {
+      showToast('Year level is required for Basic Education.', 'error');
+      return;
+    }
+  } else if (category === 'Tertiary') {
+    body.department = get('addStudentDepartmentTertiary');
+    body.program = get('addStudentProgramTertiary');
+    body.year_level = get('addStudentYearLevelTertiary');
+    if (!body.department || !body.program || !body.year_level) {
+      showToast('Department, program, and year level are required for Tertiary.', 'error');
+      return;
+    }
+  } else if (category === 'Graduate School') {
+    body.department = get('addStudentDepartmentGraduate');
+    body.program = get('addStudentProgramGraduate');
+    if (!body.department || !body.program) {
+      showToast('Department and program are required for Graduate School.', 'error');
+      return;
+    }
   }
 
   try {

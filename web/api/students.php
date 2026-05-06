@@ -45,8 +45,10 @@ function handle_get(mysqli $con): void
             first_name,
             middle_name,
             suffix,
+            category,
             program,
             year_level,
+            strand,
             department,
             rfid_uid,
             is_active,
@@ -71,8 +73,10 @@ function handle_get(mysqli $con): void
                     $student['middle_name'],
                     $student['suffix'],
                 ),
+                'category'       => $student['category'] ?: '-',
                 'program'         => $student['program'] ?: '-',
                 'year_level'     => $student['year_level'] ?: '-',
+                'strand'         => $student['strand'] ?: '-',
                 'department'     => $student['department'] ?: '-',
                 'is_active'      => (bool) $student['is_active'],
                 'created_at'     => $student['created_at'],
@@ -230,10 +234,13 @@ function handle_add(mysqli $con): void
     $firstName     = trim($body['first_name'] ?? '');
     $middleName    = trim($body['middle_name'] ?? '');
     $lastName      = trim($body['last_name'] ?? '');
+    $suffix        = trim($body['suffix'] ?? '') ?: null;
     $studentNumber = trim($body['student_number'] ?? '');
-    $program        = trim($body['program'] ?? '');
-    $yearLevel     = trim($body['year_level'] ?? '');
-    $department    = trim($body['department'] ?? '');
+    $category      = trim($body['category'] ?? '');
+    $program        = trim($body['program'] ?? '') ?: null;
+    $yearLevel     = trim($body['year_level'] ?? '') ?: null;
+    $strand        = trim($body['strand'] ?? '') ?: null;
+    $department    = trim($body['department'] ?? '') ?: null;
     $rfidUid       = trim($body['rfid_uid'] ?? '') ?: null;
 
     $errors = [];
@@ -250,16 +257,8 @@ function handle_add(mysqli $con): void
         $errors[] = 'Student number is required.';
     }
 
-    if ($program === '') {
-        $errors[] = 'Program is required.';
-    }
-
-    if ($yearLevel === '') {
-        $errors[] = 'Year level is required.';
-    }
-
-    if ($department === '') {
-        $errors[] = 'Department is required.';
+    if ($category === '') {
+        $errors[] = 'Category is required.';
     }
 
     if ($errors) {
@@ -311,8 +310,11 @@ function handle_add(mysqli $con): void
                 first_name,
                 middle_name,
                 last_name,
+                suffix,
+                category,
                 program,
                 year_level,
+                strand,
                 department,
                 rfid_uid,
                 is_active,
@@ -320,7 +322,7 @@ function handle_add(mysqli $con): void
                 updated_at
             )
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
     ");
 
     if (!$stmt) {
@@ -334,13 +336,16 @@ function handle_add(mysqli $con): void
 
     mysqli_stmt_bind_param(
         $stmt,
-        'ssssssss',
+        'sssssssssss',
         $studentNumber,
         $firstName,
         $middleName,
         $lastName,
+        $suffix,
+        $category,
         $program,
         $yearLevel,
+        $strand,
         $department,
         $rfidUid,
     );
@@ -529,8 +534,11 @@ function handle_import(mysqli $con): void
                 first_name,
                 middle_name,
                 last_name,
+                suffix,
+                category,
                 program,
                 year_level,
+                strand,
                 department,
                 rfid_uid,
                 is_active,
@@ -538,7 +546,7 @@ function handle_import(mysqli $con): void
                 updated_at
             )
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
     ");
 
     if (!$stmtDupWithRfid || !$stmtDupNoRfid || !$stmtInsert) {
@@ -572,9 +580,12 @@ function handle_import(mysqli $con): void
         }
 
         $middleName = $get($row, 'middle_name') ?: null;
-        $program     = $get($row, 'program');
-        $yearLevel  = $get($row, 'year_level');
-        $department = $get($row, 'department');
+        $suffix     = $get($row, 'suffix') ?: null;
+        $category   = $get($row, 'category') ?: null;
+        $program     = $get($row, 'program') ?: null;
+        $yearLevel  = $get($row, 'year_level') ?: null;
+        $strand     = $get($row, 'strand') ?: null;
+        $department = $get($row, 'department') ?: null;
         $rfidUid    = $get($row, 'rfid_uid') ?: null;
 
         if ($rfidUid !== null) {
@@ -614,13 +625,16 @@ function handle_import(mysqli $con): void
 
         mysqli_stmt_bind_param(
             $stmtInsert,
-            'ssssssss',
+            'sssssssssss',
             $studentNumber,
             $firstName,
             $middleName,
             $lastName,
+            $suffix,
+            $category,
             $program,
             $yearLevel,
+            $strand,
             $department,
             $rfidUid,
         );

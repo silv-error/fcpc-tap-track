@@ -28,8 +28,10 @@ CREATE TABLE IF NOT EXISTS students (
     middle_name TEXT,
     suffix TEXT,
 
+    category TEXT,
     program TEXT,
     year_level TEXT,
+    strand TEXT,
     department TEXT,
     rfid_uid TEXT NOT NULL UNIQUE,
     is_active INTEGER NOT NULL DEFAULT 1,

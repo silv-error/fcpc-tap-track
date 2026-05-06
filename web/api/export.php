@@ -88,12 +88,12 @@ try {
     if ($exportType === 'students') {
         $sql = "
             SELECT id, student_number, rfid_uid, last_name, first_name, middle_name,
-                   program, year_level, department, created_at
+                   category, program, year_level, strand, department, created_at
             FROM students
             ORDER BY last_name ASC, first_name ASC
         ";
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'];
+        $headers = ['Student No.', 'RFID UID', 'Name', 'Category', 'Program', 'Year Level', 'Strand', 'Department'];
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -367,9 +367,11 @@ try {
                 $record['student_number'],
                 $record['rfid_uid'] ?: '-',
                 $name,
-                $record['program'],
-                $record['year_level'],
-                $record['department'],
+                $record['category'] ?: '-',
+                $record['program'] ?: '-',
+                $record['year_level'] ?: '-',
+                $record['strand'] ?: '-',
+                $record['department'] ?: '-',
             ];
         } elseif ($exportType === 'employees') {
             $name    = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
