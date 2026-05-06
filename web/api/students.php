@@ -140,6 +140,74 @@ function handle_get_latest_rfid_uid(mysqli $con): void
     ]);
 }
 
+function find_rfid_uid_owner(mysqli $con, string $rfidUid, ?string $excludeType = null, int $excludeId = 0): ?array
+{
+    $normalizedUid = trim($rfidUid);
+    if ($normalizedUid === '') {
+        return null;
+    }
+
+    $studentRows = fetch_all_rows_prepared(
+        $con,
+        "
+            SELECT id, student_number, last_name, first_name, middle_name, suffix
+            FROM students
+            WHERE UPPER(rfid_uid) = UPPER(?)
+            LIMIT 1
+        ",
+        's',
+        $normalizedUid,
+    );
+
+    if (!empty($studentRows)) {
+        $owner = $studentRows[0];
+        if (!(strtolower((string) $excludeType) === 'student' && (int) $owner['id'] === $excludeId)) {
+            return [
+                'type'       => 'Student',
+                'id'         => (int) $owner['id'],
+                'reference'  => (string) $owner['student_number'],
+                'name'       => format_display_name(
+                    (string) $owner['last_name'],
+                    (string) $owner['first_name'],
+                    $owner['middle_name'] ?? null,
+                    $owner['suffix'] ?? null,
+                ),
+            ];
+        }
+    }
+
+    $employeeRows = fetch_all_rows_prepared(
+        $con,
+        "
+            SELECT id, employee_number, last_name, first_name, middle_name, suffix
+            FROM employees
+            WHERE UPPER(rfid_uid) = UPPER(?)
+            LIMIT 1
+        ",
+        's',
+        $normalizedUid,
+    );
+
+    if (!empty($employeeRows)) {
+        $owner = $employeeRows[0];
+        if (!(strtolower((string) $excludeType) === 'employee' && (int) $owner['id'] === $excludeId)) {
+            return [
+                'type'       => 'Employee',
+                'id'         => (int) $owner['id'],
+                'reference'  => (string) $owner['employee_number'],
+                'name'       => format_display_name(
+                    (string) $owner['last_name'],
+                    (string) $owner['first_name'],
+                    $owner['middle_name'] ?? null,
+                    $owner['suffix'] ?? null,
+                ),
+            ];
+        }
+    }
+
+    return null;
+}
+
 // ── POST /api/students.php ────────────────────────────────────────────────────
 
 function handle_post(mysqli $con): void
@@ -201,55 +269,40 @@ function handle_add(mysqli $con): void
         ], 422);
     }
 
-    if ($rfidUid !== null) {
-        $stmt = mysqli_prepare($con, "
-            SELECT id
-            FROM students
-            WHERE student_number = ? OR rfid_uid = ?
-            LIMIT 1
-        ");
-
-        if (!$stmt) {
-            error_log('Prepare failed: ' . mysqli_error($con));
-            json_response([
-                'success' => false,
-                'message' => 'A database error occurred.',
-            ], 500);
-        }
-
-        mysqli_stmt_bind_param($stmt, 'ss', $studentNumber, $rfidUid);
-    } else {
-        $stmt = mysqli_prepare($con, "
+    $duplicateStudentRows = fetch_all_rows_prepared(
+        $con,
+        "
             SELECT id
             FROM students
             WHERE student_number = ?
             LIMIT 1
-        ");
+        ",
+        's',
+        $studentNumber,
+    );
 
-        if (!$stmt) {
-            error_log('Prepare failed: ' . mysqli_error($con));
-            json_response([
-                'success' => false,
-                'message' => 'A database error occurred.',
-            ], 500);
-        }
-
-        mysqli_stmt_bind_param($stmt, 's', $studentNumber);
-    }
-
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_store_result($stmt);
-
-    if (mysqli_stmt_num_rows($stmt) > 0) {
-        mysqli_stmt_close($stmt);
-
+    if (!empty($duplicateStudentRows)) {
         json_response([
             'success' => false,
-            'message' => 'Student number or RFID UID already exists.',
+            'message' => 'Student number already exists.',
         ], 409);
     }
 
-    mysqli_stmt_close($stmt);
+    if ($rfidUid !== null) {
+        $rfidOwner = find_rfid_uid_owner($con, $rfidUid);
+        if ($rfidOwner !== null) {
+            json_response([
+                'success' => false,
+                'message' => sprintf(
+                    'RFID UID %s is already assigned to %s: %s (%s).',
+                    $rfidUid,
+                    $rfidOwner['type'],
+                    $rfidOwner['name'],
+                    $rfidOwner['reference'],
+                ),
+            ], 409);
+        }
+    }
 
     $stmt = mysqli_prepare($con, "
         INSERT INTO students
@@ -330,36 +383,19 @@ function handle_patch(mysqli $con): void
     }
 
     if ($rfidUid !== null) {
-        $stmt = mysqli_prepare($con, "
-            SELECT id
-            FROM students
-            WHERE rfid_uid = ? AND id != ?
-            LIMIT 1
-        ");
-
-        if (!$stmt) {
-            error_log('Prepare failed: ' . mysqli_error($con));
-
+        $rfidOwner = find_rfid_uid_owner($con, $rfidUid, 'student', $id);
+        if ($rfidOwner !== null) {
             json_response([
                 'success' => false,
-                'message' => 'A database error occurred.',
-            ], 500);
-        }
-
-        mysqli_stmt_bind_param($stmt, 'si', $rfidUid, $id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_store_result($stmt);
-
-        if (mysqli_stmt_num_rows($stmt) > 0) {
-            mysqli_stmt_close($stmt);
-
-            json_response([
-                'success' => false,
-                'message' => 'RFID UID is already assigned to another student.',
+                'message' => sprintf(
+                    'RFID UID %s is already assigned to %s: %s (%s).',
+                    $rfidUid,
+                    $rfidOwner['type'],
+                    $rfidOwner['name'],
+                    $rfidOwner['reference'],
+                ),
             ], 409);
         }
-
-        mysqli_stmt_close($stmt);
     }
 
     $stmt = mysqli_prepare($con, "
