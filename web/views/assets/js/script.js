@@ -16,6 +16,10 @@ const exportState = {
   entity: '',
 };
 
+const realtimeState = {
+  timer: null,
+};
+
 function escapeText(value) {
   return value === null || value === undefined || value === '' ? '-' : String(value);
 }
@@ -28,6 +32,19 @@ function normalizeDate(value) {
 function formatTime(value) {
   if (!value || value === '-') return '-';
   return String(value).slice(0, 5);
+}
+
+function formatLongDate(value) {
+  if (!value || value === '-') return '-';
+  try {
+    const date = new Date(value);
+    const dateOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+    const dateStr = date.toLocaleDateString('en-US', dateOptions);
+    const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    return `${dateStr} ${timeStr}`;
+  } catch {
+    return String(value);
+  }
 }
 
 function parseNameParts(record) {
@@ -295,6 +312,23 @@ function updatePagination(totalPages) {
   renderPageNumbers(totalPages);
 }
 
+function triggerPaginationTransition() {
+  const table = tableState.table;
+  if (!table) return;
+
+  const wrapper = table.closest('.table-wrapper');
+  if (!wrapper) return;
+
+  wrapper.classList.remove('pagination-transition');
+  void wrapper.offsetWidth;
+  wrapper.classList.add('pagination-transition');
+
+  window.clearTimeout(triggerPaginationTransition._timer);
+  triggerPaginationTransition._timer = window.setTimeout(() => {
+    wrapper.classList.remove('pagination-transition');
+  }, 240);
+}
+
 function renderCurrentPage() {
   const table = tableState.table;
   if (!table) return;
@@ -388,12 +422,44 @@ function renderCurrentPage() {
   updatePagination(totalPages);
 }
 
-function populateDepartmentSelect(rows) {
+function populateDepartmentSelect() {
   const departmentSelect = document.getElementById('departmentSelect');
   if (!departmentSelect) return;
 
   const existingValue = departmentSelect.value || 'all';
-  const departments = [...new Set(rows.map((row) => row.department).filter(Boolean))].sort();
+  const studentDepartments = [
+    'College of Accountancy',
+    'College of Allied Medical Sciences',
+    'College of Business Management',
+    'College of Criminal Justice',
+    'College of Education',
+    'College of Computer Studies',
+    'College of Arts and Sciences',
+    'College of Engineering',
+    'Basic Education',
+    'Senior High School (Academic)',
+    'Senior High School (Technical-Vocational)',
+    'Senior High School (Information and Communication Technology)',
+    'Senior High School (Agriculture and Fishery Arts)',
+    'Senior High School (Arts and Design)',
+  ];
+  const employeeDepartments = [
+    'College of Accountancy',
+    'College of Allied Medical Sciences',
+    'College of Business Management',
+    'College of Criminal Justice',
+    'College of Education',
+    'College of Computer Studies',
+    'College of Arts and Sciences',
+    'College of Engineering',
+    'Basic Education',
+    'Senior High School (Academic)',
+    'Senior High School (Technical-Vocational)',
+    'Senior High School (Information and Communication Technology)',
+    'Senior High School (Agriculture and Fishery Arts)',
+    'Senior High School (Arts and Design)',
+  ];
+  const departments = tableState.pageType === 'students' ? studentDepartments : employeeDepartments;
 
   departmentSelect.innerHTML = '<option value="all">All Departments</option>';
   departments.forEach((department) => {
@@ -413,7 +479,13 @@ function populateYearLevelSelect(rows) {
   if (!select) return;
 
   const existingValue = select.value || 'all';
-  const yearLevels = [...new Set(rows.map((row) => row.year_level).filter(Boolean))].sort();
+  const yearLevels = [
+    'Kindergarten',
+    'Elementary',
+    'Junior High School',
+    'Senior High School',
+    'College',
+  ];
 
   select.innerHTML = '<option value="all">All Year Levels</option>';
   yearLevels.forEach((yearLevel) => {
@@ -433,7 +505,59 @@ function populateCourseSelect(rows) {
   if (!select) return;
 
   const existingValue = select.value || 'all';
-  const courses = [...new Set(rows.map((row) => row.course).filter(Boolean))].sort();
+  const courses = [
+    'Bachelor of Science in Accountancy',
+    'Bachelor of Science in Management Accounting',
+    'Bachelor of Science in Accounting Information System',
+    'Bachelor of Science in Internal Auditing',
+    'Bachelor of Science in Nursing',
+    'Bachelor of Science in Midwifery',
+    'Bachelor of Science in Hospitality Management',
+    'Bachelor of Science in Tourism Management',
+    'Bachelor of Science in Office Management',
+    'Bachelor of Science in Business Administration Major in Finance Management',
+    'Bachelor of Science in Business Administration Major in Marketing Management',
+    'Bachelor of Science in Criminology',
+    'Bachelor of Elementary Education',
+    'Bachelor of Secondary Education Major in: English, Science, Mathematics, Social Studies, Values Education, and Filipino',
+    'Certificate in Teaching Education',
+    'Bachelor of Physical Education',
+    'Bachelor of Technology & Livelihood Education',
+    'Bachelor of Science in Information Technology with CISCO Certification program',
+    'Bachelor of Science in Information Technology with specialization in Software Engineering',
+    'Bachelor of Science in Information Technology with specialization in Cybersecurity',
+    'Bachelor of Science in Computer Science',
+    'Bachelor or Arts in Communication',
+    'Bachelor of Science in Biology',
+    'Bachelor of Science in Psychology',
+    'Bachelor or Arts in Psychology',
+    'Bachelor of Science in Civil Engineering',
+    'Kindergarten',
+    'Elementary',
+    'Junior High School (With STE Programs)',
+    'Senior High School',
+    'General Academic Strand (GAS)',
+    'Accountancy, Business and Management (ABM)',
+    'Humanities and Social Sciences Strand (HUMSS)',
+    'Science, Technology, Engineering, and Mathematics Strand (STEM)',
+    'Home Economics',
+    'Tourism Promotion Services (NC II)',
+    'Front Office Services (NC II)',
+    'Beauty/Nail Care (NC II)',
+    'Bread and Pastry Production (NC II)',
+    'Food and Beverage Services (NC II)',
+    'Hair Dressing (NC II)',
+    'Cookery (NC II)',
+    'Commercial Cooking (NC II)',
+    'Caregiving (NC II)',
+    'Contact Center Services (NC II)',
+    'Computer Hardware Servicing (NC II)',
+    'Technical Drafting (NC II)',
+    'Crop Production (NC II)',
+    'Organic Agriculture (NC II)',
+    'Performing Arts',
+    'Visual Arts',
+  ];
 
   select.innerHTML = '<option value="all">All Courses</option>';
   courses.forEach((course) => {
@@ -468,7 +592,7 @@ function populatePositionSelect(rows) {
   }
 }
 
-function applyFilters() {
+function applyFilters(resetToFirstPage = true) {
   const searchInput      = document.getElementById('searchInput');
   const typeSelect       = document.getElementById('typeSelect');
   const dateInput        = document.getElementById('dateInput');
@@ -498,7 +622,9 @@ function applyFilters() {
     );
   });
 
-  tableState.currentPage = 1;
+  if (resetToFirstPage) {
+    tableState.currentPage = 1;
+  }
   renderCurrentPage();
 }
 
@@ -552,7 +678,7 @@ async function loadTableData() {
     tableState.filteredRows = tableState.rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
-      populateDepartmentSelect(rows);
+      populateDepartmentSelect();
     }
 
     if (tableState.pageType === 'students') {
@@ -578,6 +704,7 @@ function goToPage(pageNum) {
   const totalPages = Math.max(1, Math.ceil(tableState.filteredRows.length / rowsPerPage));
   if (pageNum < 1 || pageNum > totalPages) return;
   tableState.currentPage = pageNum;
+  triggerPaginationTransition();
   renderCurrentPage();
 }
 
@@ -860,9 +987,10 @@ function getExportModalBody(pageType, rows) {
   if (pageType === 'students') {
     return `
       <div class="export-body-grid">
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" />
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <div id="exportSearchResults" style="position:absolute; left:0; right:0; top:100%; margin-top:6px; border:1px solid #d0d7de; border-radius:8px; max-height:220px; overflow-y:auto; display:none; background:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;"></div>
         </div>
 
         <div class="export-section-label export-field-full">Filter</div>
@@ -870,23 +998,92 @@ function getExportModalBody(pageType, rows) {
         <div class="export-field">
           <label for="exportDepartmentSelect">Department</label>
           <select id="exportDepartmentSelect" class="export-control export-select">
-            ${optionsFromRows('department', 'All Departments')}
+            <option value="all">All Departments</option>
+            <option value="College of Accountancy">College of Accountancy</option>
+            <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+            <option value="College of Business Management">College of Business Management</option>
+            <option value="College of Criminal Justice">College of Criminal Justice</option>
+            <option value="College of Education">College of Education</option>
+            <option value="College of Computer Studies">College of Computer Studies</option>
+            <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+            <option value="College of Engineering">College of Engineering</option>
+            <option value="Basic Education">Basic Education</option>
+            <option value="Senior High School (Academic)">Senior High School (Academic)</option>
+            <option value="Senior High School (Technical-Vocational)">Senior High School (Technical-Vocational)</option>
+            <option value="Senior High School (Information and Communication Technology)">Senior High School (Information and Communication Technology)</option>
+            <option value="Senior High School (Agriculture and Fishery Arts)">Senior High School (Agriculture and Fishery Arts)</option>
+            <option value="Senior High School (Arts and Design)">Senior High School (Arts and Design)</option>
           </select>
         </div>
 
         <div class="export-field">
           <label for="exportCourseSelect">Course</label>
           <select id="exportCourseSelect" class="export-control export-select">
-            ${optionsFromRows('course', 'All Courses')}
+            <option value="all">All Courses</option>
+            <option value="Bachelor of Science in Accountancy">Bachelor of Science in Accountancy</option>
+            <option value="Bachelor of Science in Management Accounting">Bachelor of Science in Management Accounting</option>
+            <option value="Bachelor of Science in Accounting Information System">Bachelor of Science in Accounting Information System</option>
+            <option value="Bachelor of Science in Internal Auditing">Bachelor of Science in Internal Auditing</option>
+            <option value="Bachelor of Science in Nursing">Bachelor of Science in Nursing</option>
+            <option value="Bachelor of Science in Midwifery">Bachelor of Science in Midwifery</option>
+            <option value="Bachelor of Science in Hospitality Management">Bachelor of Science in Hospitality Management</option>
+            <option value="Bachelor of Science in Tourism Management">Bachelor of Science in Tourism Management</option>
+            <option value="Bachelor of Science in Office Management">Bachelor of Science in Office Management</option>
+            <option value="Bachelor of Science in Business Administration Major in Finance Management">Bachelor of Science in Business Administration Major in Finance Management</option>
+            <option value="Bachelor of Science in Business Administration Major in Marketing Management">Bachelor of Science in Business Administration Major in Marketing Management</option>
+            <option value="Bachelor of Science in Criminology">Bachelor of Science in Criminology</option>
+            <option value="Bachelor of Elementary Education">Bachelor of Elementary Education</option>
+            <option value="Bachelor of Secondary Education Major in: English, Science, Mathematics, Social Studies, Values Education, and Filipino">Bachelor of Secondary Education Major in: English, Science, Mathematics, Social Studies, Values Education, and Filipino</option>
+            <option value="Certificate in Teaching Education">Certificate in Teaching Education</option>
+            <option value="Bachelor of Physical Education">Bachelor of Physical Education</option>
+            <option value="Bachelor of Technology & Livelihood Education">Bachelor of Technology & Livelihood Education</option>
+            <option value="Bachelor of Science in Information Technology with CISCO Certification program">Bachelor of Science in Information Technology with CISCO Certification program</option>
+            <option value="Bachelor of Science in Information Technology with specialization in Software Engineering">Bachelor of Science in Information Technology with specialization in Software Engineering</option>
+            <option value="Bachelor of Science in Information Technology with specialization in Cybersecurity">Bachelor of Science in Information Technology with specialization in Cybersecurity</option>
+            <option value="Bachelor of Science in Computer Science">Bachelor of Science in Computer Science</option>
+            <option value="Bachelor or Arts in Communication">Bachelor or Arts in Communication</option>
+            <option value="Bachelor of Science in Biology">Bachelor of Science in Biology</option>
+            <option value="Bachelor of Science in Psychology">Bachelor of Science in Psychology</option>
+            <option value="Bachelor or Arts in Psychology">Bachelor or Arts in Psychology</option>
+            <option value="Bachelor of Science in Civil Engineering">Bachelor of Science in Civil Engineering</option>
+            <option value="Kindergarten">Kindergarten</option>
+            <option value="Elementary">Elementary</option>
+            <option value="Junior High School (With STE Programs)">Junior High School (With STE Programs)</option>
+            <option value="Senior High School">Senior High School</option>
+            <option value="General Academic Strand (GAS)">General Academic Strand (GAS)</option>
+            <option value="Accountancy, Business and Management (ABM)">Accountancy, Business and Management (ABM)</option>
+            <option value="Humanities and Social Sciences Strand (HUMSS)">Humanities and Social Sciences Strand (HUMSS)</option>
+            <option value="Science, Technology, Engineering, and Mathematics Strand (STEM)">Science, Technology, Engineering, and Mathematics Strand (STEM)</option>
+            <option value="Home Economics">Home Economics</option>
+            <option value="Tourism Promotion Services (NC II)">Tourism Promotion Services (NC II)</option>
+            <option value="Front Office Services (NC II)">Front Office Services (NC II)</option>
+            <option value="Beauty/Nail Care (NC II)">Beauty/Nail Care (NC II)</option>
+            <option value="Bread and Pastry Production (NC II)">Bread and Pastry Production (NC II)</option>
+            <option value="Food and Beverage Services (NC II)">Food and Beverage Services (NC II)</option>
+            <option value="Hair Dressing (NC II)">Hair Dressing (NC II)</option>
+            <option value="Cookery (NC II)">Cookery (NC II)</option>
+            <option value="Commercial Cooking (NC II)">Commercial Cooking (NC II)</option>
+            <option value="Caregiving (NC II)">Caregiving (NC II)</option>
+            <option value="Contact Center Services (NC II)">Contact Center Services (NC II)</option>
+            <option value="Computer Hardware Servicing (NC II)">Computer Hardware Servicing (NC II)</option>
+            <option value="Technical Drafting (NC II)">Technical Drafting (NC II)</option>
+            <option value="Crop Production (NC II)">Crop Production (NC II)</option>
+            <option value="Organic Agriculture (NC II)">Organic Agriculture (NC II)</option>
+            <option value="Performing Arts">Performing Arts</option>
+            <option value="Visual Arts">Visual Arts</option>
           </select>
         </div>
 
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label>Year Level</label>
           <div class="export-checkbox-row">
+            <label class="export-checkbox">
+              <input type="checkbox" id="exportYearLevelAll" class="export-year-level-all" />
+              <span>All</span>
+            </label>
             ${['1st Year', '2nd Year', '3rd Year', '4th Year'].map((level) => `
               <label class="export-checkbox">
-                <input type="checkbox" name="exportYearLevel" value="${level}" />
+                <input type="checkbox" name="exportYearLevel" value="${level}" class="export-year-level-item" />
                 <span>${level}</span>
               </label>
             `).join('')}
@@ -920,9 +1117,10 @@ function getExportModalBody(pageType, rows) {
   if (pageType === 'employees') {
     return `
       <div class="export-body-grid">
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Employee Number" />
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Employee Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <div id="exportSearchResults" style="position:absolute; left:0; right:0; top:100%; margin-top:6px; border:1px solid #d0d7de; border-radius:8px; max-height:220px; overflow-y:auto; display:none; background:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;"></div>
         </div>
 
         <div class="export-section-label export-field-full">Filter</div>
@@ -930,7 +1128,21 @@ function getExportModalBody(pageType, rows) {
         <div class="export-field">
           <label for="exportDepartmentSelect">Department</label>
           <select id="exportDepartmentSelect" class="export-control export-select">
-            ${optionsFromRows('department', 'All Departments')}
+            <option value="all">All Departments</option>
+            <option value="College of Accountancy">College of Accountancy</option>
+            <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+            <option value="College of Business Management">College of Business Management</option>
+            <option value="College of Criminal Justice">College of Criminal Justice</option>
+            <option value="College of Education">College of Education</option>
+            <option value="College of Computer Studies">College of Computer Studies</option>
+            <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+            <option value="College of Engineering">College of Engineering</option>
+            <option value="Basic Education">Basic Education</option>
+            <option value="Senior High School (Academic)">Senior High School (Academic)</option>
+            <option value="Senior High School (Technical-Vocational)">Senior High School (Technical-Vocational)</option>
+            <option value="Senior High School (Information and Communication Technology)">Senior High School (Information and Communication Technology)</option>
+            <option value="Senior High School (Agriculture and Fishery Arts)">Senior High School (Agriculture and Fishery Arts)</option>
+            <option value="Senior High School (Arts and Design)">Senior High School (Arts and Design)</option>
           </select>
         </div>
 
@@ -967,23 +1179,31 @@ function getExportModalBody(pageType, rows) {
   if (pageType === 'attendance') {
     return `
       <div class="export-body-grid">
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or ID Number" />
+          <input id="exportSearchInput" type="text" class="export-control"
+            placeholder="Search by Name or ID Number" autocomplete="off"
+            oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <div id="exportSearchResults"
+            style="position:absolute; left:0; right:0; top:100%; margin-top:6px;
+                   border:1px solid #d0d7de; border-radius:8px; max-height:220px;
+                   overflow-y:auto; display:none; background:#fff;
+                   box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;">
+          </div>
         </div>
-
+ 
         <div class="export-section-label export-field-full">Filter By (Date Range)</div>
-
+ 
         <div class="export-field">
           <label for="exportDateFrom">From</label>
           <input id="exportDateFrom" type="date" class="export-control" />
         </div>
-
+ 
         <div class="export-field">
           <label for="exportDateTo">To</label>
           <input id="exportDateTo" type="date" class="export-control" />
         </div>
-
+ 
         <div class="export-field export-field-full">
           <label>User Type</label>
           <div class="export-checkbox-row">
@@ -995,9 +1215,9 @@ function getExportModalBody(pageType, rows) {
             `).join('')}
           </div>
         </div>
-
+ 
         <div class="export-section-label export-field-full">Sort By</div>
-
+ 
         <div class="export-field">
           <label for="exportPrimarySort">Primary Sort</label>
           <select id="exportPrimarySort" class="export-control export-select">
@@ -1007,7 +1227,7 @@ function getExportModalBody(pageType, rows) {
             <option value="type">Type</option>
           </select>
         </div>
-
+ 
         <div class="export-field">
           <label for="exportSortOrder">Order</label>
           <select id="exportSortOrder" class="export-control export-select">
@@ -1039,11 +1259,214 @@ function openExportModal() {
 
   title.textContent = `Export ${getExportPageLabel(pageType)} Records`;
   body.innerHTML = getExportModalBody(pageType, rows);
+  initExportSearchSuggestions(pageType, rows);
+
+  if (pageType === 'students') {
+    initStudentExportCourseState();
+    initStudentExportYearLevelState();
+  }
+
   modal.classList.add('show');
 }
 
 function closeExportModal() {
   document.getElementById('exportModal')?.classList.remove('show');
+}
+
+function initExportSearchSuggestions(pageType, rows) {
+  tableState.exportSearchPageType = pageType;
+  tableState.exportSearchRows = Array.isArray(rows) ? rows.slice() : [];
+  tableState.exportSearchQuery = '';
+
+  const input = document.getElementById('exportSearchInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+
+  renderExportSearchSuggestions('');
+}
+
+function getExportSearchCandidate(record, pageType) {
+  if (pageType === 'students') {
+    return {
+      id: escapeText(record.student_number),
+      name: escapeText(record.name),
+      department: escapeText(record.department),
+      display: `${escapeText(record.student_number)} — ${escapeText(record.name)}${record.department && record.department !== '-' ? ` (${escapeText(record.department)})` : ''}`,
+      searchText: [record.student_number, record.name, record.department].join(' ').toLowerCase(),
+    };
+  }
+
+  if (pageType === 'employees') {
+    return {
+      id: escapeText(record.employee_number),
+      name: escapeText(record.name),
+      department: escapeText(record.department),
+      display: `${escapeText(record.employee_number)} — ${escapeText(record.name)}${record.department && record.department !== '-' ? ` (${escapeText(record.department)})` : ''}`,
+      searchText: [record.employee_number, record.name, record.department].join(' ').toLowerCase(),
+    };
+  }
+
+  if (pageType === 'attendance') {
+    return {
+      id: escapeText(record.reference_number),
+      name: escapeText(record.name),
+      department: escapeText(record.department),
+      display: `${escapeText(record.reference_number)} — ${escapeText(record.name)}${record.department && record.department !== '-' ? ` (${escapeText(record.department)})` : ''}`,
+      searchText: [record.reference_number, record.name, record.department, record.record_type, record.log_date].join(' ').toLowerCase(),
+    };
+  }
+
+  return null;
+}
+
+function renderExportSearchSuggestions(query) {
+  const box = document.getElementById('exportSearchResults');
+  if (!box) return;
+
+  const pageType = tableState.exportSearchPageType;
+  const rows = Array.isArray(tableState.exportSearchRows) ? tableState.exportSearchRows : [];
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    box.innerHTML = '';
+    box.style.display = 'none';
+    return;
+  }
+
+  const matches = [];
+  rows.forEach((record) => {
+    const candidate = getExportSearchCandidate(record, pageType);
+    if (!candidate) return;
+
+    if (
+      candidate.searchText.includes(normalizedQuery) ||
+      candidate.display.toLowerCase().includes(normalizedQuery) ||
+      candidate.id.toLowerCase().includes(normalizedQuery) ||
+      candidate.name.toLowerCase().includes(normalizedQuery)
+    ) {
+      matches.push(candidate);
+    }
+  });
+
+  const uniqueMatches = [];
+  const seen = new Set();
+  matches.forEach((item) => {
+    const key = `${item.id}::${item.name}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    uniqueMatches.push(item);
+  });
+
+  const limitedMatches = uniqueMatches.slice(0, 12);
+
+  if (!limitedMatches.length) {
+    box.innerHTML = '<div style="padding:10px 14px;color:#888;font-size:13px;">No matching records found.</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  box.innerHTML = limitedMatches.map((item) => `
+    <div class="export-result-item"
+      style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;"
+      onmouseenter="this.style.background='#e8eaf6'"
+      onmouseleave="this.style.background=''"
+      onclick="selectExportSearchResult(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+      <strong>${item.id}</strong> — ${item.name}
+      ${item.department && item.department !== '-' ? `<span style="color:#888;margin-left:6px;">(${item.department})</span>` : ''}
+    </div>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function onExportSearchInput() {
+  const input = document.getElementById('exportSearchInput');
+  if (!input) return;
+
+  tableState.exportSearchQuery = input.value || '';
+  renderExportSearchSuggestions(tableState.exportSearchQuery);
+}
+
+function selectExportSearchResult(result) {
+  const input = document.getElementById('exportSearchInput');
+  const box = document.getElementById('exportSearchResults');
+
+  if (input) {
+    input.value = result.id && result.name ? `${result.id} — ${result.name}` : (result.id || result.name || '');
+  }
+
+  if (box) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
+
+  tableState.exportSearchQuery = input?.value || '';
+}
+
+function initStudentExportCourseState() {
+  const departmentSelect = document.getElementById('exportDepartmentSelect');
+  const courseSelect = document.getElementById('exportCourseSelect');
+  if (!departmentSelect || !courseSelect) return;
+
+  const allCourses = [...new Set(Object.values(departmentCoursesMap).flat())];
+
+  const renderCourseOptions = (courses, selectedValue) => {
+    courseSelect.innerHTML = '<option value="all">All Courses</option>';
+
+    courses.forEach((course) => {
+      const option = document.createElement('option');
+      option.value = course;
+      option.textContent = course;
+      courseSelect.appendChild(option);
+    });
+
+    if ([...courseSelect.options].some((option) => option.value === selectedValue)) {
+      courseSelect.value = selectedValue;
+    } else {
+      courseSelect.value = 'all';
+    }
+  };
+
+  const applyState = () => {
+    const selectedDepartment = departmentSelect.value || 'all';
+    const currentCourse = courseSelect.value || 'all';
+
+    if (selectedDepartment === 'all') {
+      renderCourseOptions(allCourses, currentCourse);
+      return;
+    }
+
+    renderCourseOptions(departmentCoursesMap[selectedDepartment] || [], currentCourse);
+  };
+
+  departmentSelect.addEventListener('change', applyState);
+  applyState();
+}
+
+function initStudentExportYearLevelState() {
+  const departmentSelect = document.getElementById('exportDepartmentSelect');
+  if (!departmentSelect) return;
+
+  const applyState = () => {
+    const selectedDepartment = (departmentSelect.value || '').toLowerCase();
+    const disableYearLevels = selectedDepartment === 'basic education' || selectedDepartment.startsWith('senior high school');
+    const allYearLevels = document.getElementById('exportYearLevelAll');
+    const yearLevelItems = [...document.querySelectorAll('input[name="exportYearLevel"]')];
+
+    if (allYearLevels) {
+      allYearLevels.disabled = disableYearLevels;
+      if (disableYearLevels) allYearLevels.checked = false;
+    }
+
+    yearLevelItems.forEach((input) => {
+      input.disabled = disableYearLevels;
+      if (disableYearLevels) input.checked = false;
+    });
+  };
+
+  departmentSelect.addEventListener('change', applyState);
+  applyState();
 }
 
 function collectExportRows(pageType) {
@@ -1062,12 +1485,17 @@ function collectExportRows(pageType) {
     if (pageType === 'students') {
       const departmentVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
       const courseVal = (document.getElementById('exportCourseSelect')?.value || 'all').toLowerCase();
-      const yearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value.toLowerCase());
+      const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
+      const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value.toLowerCase());
       const yearLevelValue = (model.yearLevel || '').toLowerCase();
 
       if (departmentVal !== 'all' && model.department.toLowerCase() !== departmentVal) return false;
       if (courseVal !== 'all' && model.course.toLowerCase() !== courseVal) return false;
-      if (yearLevels.length && !yearLevels.includes(yearLevelValue)) return false;
+      
+      // If "All" is checked, skip year level filter; otherwise filter by selected year levels
+      if (!allYearLevels && selectedYearLevels.length > 0 && !selectedYearLevels.includes(yearLevelValue)) {
+        return false;
+      }
     }
 
     if (pageType === 'employees') {
@@ -1117,7 +1545,10 @@ async function handleExport() {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
     filters.course = document.getElementById('exportCourseSelect')?.value || 'all';
-    filters.yearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
+    const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
+    const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
+    filters.yearLevels = allYearLevels ? [] : selectedYearLevels;
+    filters.allYearLevels = allYearLevels;
   } else if (pageType === 'employees') {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
@@ -1134,7 +1565,7 @@ async function handleExport() {
   formData.append('filters', JSON.stringify(filters));
 
   try {
-    const response = await fetch('../../api/export.php', {
+    const response = await fetch('../api/export.php', {
       method: 'POST',
       body: formData,
     });
@@ -1148,8 +1579,13 @@ async function handleExport() {
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+    const serverFileName = match?.[1] ? decodeURIComponent(match[1].trim()) : '';
+
     link.href = url;
-    link.download = `${pageType}-records.xlsx`;
+    link.download = serverFileName || `${pageType}-records.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1215,7 +1651,7 @@ async function reloadTable() {
     tableState.filteredRows = tableState.rows.slice();
 
     if (tableState.pageType === 'students' || tableState.pageType === 'employees') {
-      populateDepartmentSelect(rows);
+      populateDepartmentSelect();
     }
 
     if (tableState.pageType === 'students') {
@@ -1225,9 +1661,35 @@ async function reloadTable() {
       populatePositionSelect(rows);
     }
 
-    applyFilters();
+    applyFilters(false);
   } catch (error) {
     console.error('Failed to reload table:', error);
+  }
+}
+
+function isModalOpen() {
+  return Boolean(document.querySelector('.modal.show'));
+}
+
+function startRealtimeTableRefresh() {
+  if (!tableState.table || tableState.pageType !== 'attendance') {
+    return;
+  }
+
+  const refreshMs = 1000;
+
+  stopRealtimeTableRefresh();
+
+  realtimeState.timer = window.setInterval(() => {
+    if (document.hidden || isModalOpen()) return;
+    reloadTable();
+  }, refreshMs);
+}
+
+function stopRealtimeTableRefresh() {
+  if (realtimeState.timer !== null) {
+    window.clearInterval(realtimeState.timer);
+    realtimeState.timer = null;
   }
 }
 
@@ -1264,8 +1726,8 @@ function openViewUserModal(record) {
   setValue('viewUserEmail', record.email);
   setValue('viewUserRole', record.role);
   setValue('viewUserStatus', record.is_active ? 'Active' : 'Inactive');
-  setText('viewUserCreatedAt', record.created_at || '-');
-  setText('viewUserUpdatedAt', record.updated_at || '-');
+  setText('viewUserCreatedAt', formatLongDate(record.created_at));
+  setText('viewUserUpdatedAt', formatLongDate(record.updated_at));
 
   modal.classList.add('show');
 }
@@ -1351,6 +1813,176 @@ if (typeof saveAddUser === 'undefined') {
 
 // ── Students ──────────────────────────────────────────────────────────────────
 
+// Department to Courses Mapping for Add Student Modal
+const departmentCoursesMap = {
+  'Basic Education': [
+    'Kindergarten',
+    'Elementary',
+    'Junior High School (With STE Programs)',
+    'Senior High School',
+  ],
+  'Senior High School (Academic)': [
+    'General Academic Strand (GAS)',
+    'Accountancy, Business and Management (ABM)',
+    'Humanities and Social Sciences Strand (HUMSS)',
+    'Science, Technology, Engineering, and Mathematics Strand (STEM)',
+  ],
+  'Senior High School (Technical-Vocational)': [
+    'Home Economics',
+    'Tourism Promotion Services (NC II)',
+    'Front Office Services (NC II)',
+    'Beauty/Nail Care (NC II)',
+    'Bread and Pastry Production (NC II)',
+    'Food and Beverage Services (NC II)',
+    'Hair Dressing (NC II)',
+    'Cookery (NC II)',
+    'Commercial Cooking (NC II)',
+    'Caregiving (NC II)',
+  ],
+  'Senior High School (Information and Communication Technology)': [
+    'Contact Center Services (NC II)',
+    'Computer Hardware Servicing (NC II)',
+    'Technical Drafting (NC II)',
+  ],
+  'Senior High School (Agriculture and Fishery Arts)': [
+    'Crop Production (NC II)',
+    'Organic Agriculture (NC II)',
+  ],
+  'Senior High School (Arts and Design)': [
+    'Performing Arts',
+    'Visual Arts',
+  ],
+  'College of Accountancy': [
+    'Bachelor of Science in Accountancy',
+    'Bachelor of Science in Management Accounting',
+    'Bachelor of Science in Accounting Information System',
+    'Bachelor of Science in Internal Auditing',
+  ],
+  'College of Allied Medical Sciences': [
+    'Bachelor of Science in Nursing',
+    'Bachelor of Science in Midwifery',
+  ],
+  'College of Business Management': [
+    'Bachelor of Science in Hospitality Management',
+    'Bachelor of Science in Tourism Management',
+    'Bachelor of Science in Office Management',
+    'Bachelor of Science in Business Administration Major in Finance Management',
+    'Bachelor of Science in Business Administration Major in Marketing Management',
+  ],
+  'College of Criminal Justice': [
+    'Bachelor of Science in Criminology',
+  ],
+  'College of Education': [
+    'Bachelor of Elementary Education',
+    'Bachelor of Secondary Education Major in: English, Science, Mathematics, Social Studies, Values Education, and Filipino',
+    'Certificate in Teaching Education',
+    'Bachelor of Physical Education',
+    'Bachelor of Technology & Livelihood Education',
+  ],
+  'College of Computer Studies': [
+    'Bachelor of Science in Information Technology with CISCO Certification program',
+    'Bachelor of Science in Information Technology with specialization in Software Engineering',
+    'Bachelor of Science in Information Technology with specialization in Cybersecurity',
+    'Bachelor of Science in Computer Science',
+  ],
+  'College of Arts and Sciences': [
+    'Bachelor or Arts in Communication',
+    'Bachelor of Science in Biology',
+    'Bachelor of Science in Psychology',
+    'Bachelor or Arts in Psychology',
+  ],
+  'College of Engineering': [
+    'Bachelor of Science in Civil Engineering',
+  ],
+};
+
+// Update course options based on selected department
+function updateCourseOptionsForAddStudent() {
+  const departmentSelect = document.getElementById('addStudentDepartment');
+  const courseSelect = document.getElementById('addStudentCourse');
+
+  if (!departmentSelect || !courseSelect) return;
+
+  const selectedDepartment = departmentSelect.value;
+  const courses = departmentCoursesMap[selectedDepartment] || [];
+
+  // Clear and disable course select if no department is selected
+  if (!selectedDepartment) {
+    courseSelect.innerHTML = '<option value="">Select Course</option>';
+    courseSelect.disabled = true;
+    courseSelect.classList.add('disabled');
+    return;
+  }
+
+  // Enable course select and populate with filtered courses
+  courseSelect.disabled = false;
+  courseSelect.classList.remove('disabled');
+  courseSelect.innerHTML = '<option value="">Select Course</option>';
+
+  courses.forEach((course) => {
+    const option = document.createElement('option');
+    option.value = course;
+    option.textContent = course;
+    courseSelect.appendChild(option);
+  });
+}
+
+// Update year level options based on selected course
+function updateYearLevelOptionsForAddStudent() {
+  const courseSelect = document.getElementById('addStudentCourse');
+  const yearLevelSelect = document.getElementById('addStudentYearLevel');
+
+  if (!courseSelect || !yearLevelSelect) return;
+
+  const selectedCourse = courseSelect.value;
+
+  // Default options for college (1st-4th Year)
+  const collegeOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
+  const elementaryOptions = ['Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6'];
+  const juniorHighOptions = ['Grade 7', 'Grade 8', 'Grade 9', 'Grade 10'];
+  const seniorHighOptions = ['Grade 11', 'Grade 12'];
+
+  let optionsToUse = collegeOptions;
+  let isDisabled = false;
+
+  if (selectedCourse === 'Kindergarten') {
+    isDisabled = true;
+  } else if (selectedCourse === 'Elementary') {
+    optionsToUse = elementaryOptions;
+  } else if (selectedCourse === 'Junior High School (With STE Programs)') {
+    optionsToUse = juniorHighOptions;
+  } else if (selectedCourse === 'Senior High School') {
+    optionsToUse = seniorHighOptions;
+  }
+
+  yearLevelSelect.disabled = isDisabled;
+  yearLevelSelect.classList.toggle('disabled', isDisabled);
+  yearLevelSelect.innerHTML = '<option value="">Select Year Level</option>';
+
+  if (!isDisabled) {
+    optionsToUse.forEach((option) => {
+      const optionElement = document.createElement('option');
+      optionElement.value = option;
+      optionElement.textContent = option;
+      yearLevelSelect.appendChild(optionElement);
+    });
+  }
+}
+
+// Initialize course filtering when Add Student Modal is opened
+function initAddStudentModalCourseFiltering() {
+  const departmentSelect = document.getElementById('addStudentDepartment');
+  const courseSelect = document.getElementById('addStudentCourse');
+
+  if (departmentSelect) {
+    departmentSelect.addEventListener('change', updateCourseOptionsForAddStudent);
+  }
+
+  if (courseSelect) {
+    courseSelect.addEventListener('change', updateYearLevelOptionsForAddStudent);
+  }
+}
+
 function openViewStudentModal(record) {
   const modal = document.getElementById('viewStudentModal');
   if (!modal) return;
@@ -1367,8 +1999,8 @@ function openViewStudentModal(record) {
   setValue('viewStudentYearLevel',  record.year_level);
   setValue('viewStudentDepartment', record.department);
   setValue('viewStudentRfid',       record.rfid_uid);
-  setText('viewStudentCreatedAt',   record.created_at || '-');
-  setText('viewStudentUpdatedAt',   record.updated_at || '-');
+  setText('viewStudentCreatedAt',   formatLongDate(record.created_at));
+  setText('viewStudentUpdatedAt',   formatLongDate(record.updated_at));
 
   modal.classList.add('show');
 }
@@ -1424,6 +2056,29 @@ function openAddStudentModal() {
   const modal = document.getElementById('addStudentModal');
   if (!modal) return;
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.querySelectorAll('select').forEach((el) => (el.value = ''));
+  
+  // Reset course field to disabled state
+  const courseSelect = document.getElementById('addStudentCourse');
+  if (courseSelect) {
+    courseSelect.disabled = true;
+    courseSelect.classList.add('disabled');
+    courseSelect.innerHTML = '<option value="">Select Course</option>';
+  }
+
+  // Reset year level to college defaults
+  const yearLevelSelect = document.getElementById('addStudentYearLevel');
+  if (yearLevelSelect) {
+    yearLevelSelect.disabled = false;
+    yearLevelSelect.classList.remove('disabled');
+  }
+  
+  // Initialize course filtering event listener
+  initAddStudentModalCourseFiltering();
+
+  // Set initial year level options (college defaults)
+  updateYearLevelOptionsForAddStudent();
+  
   modal.classList.add('show');
 }
 
@@ -1479,8 +2134,8 @@ function openViewEmployeeModal(record) {
   setValue('viewEmployeeDepartment', record.department);
   setValue('viewEmployeePosition',   record.position);
   setValue('viewEmployeeRfid',       record.rfid_uid);
-  setText('viewEmployeeCreatedAt',   record.created_at || '-');
-  setText('viewEmployeeUpdatedAt',   record.updated_at || '-');
+  setText('viewEmployeeCreatedAt',   formatLongDate(record.created_at));
+  setText('viewEmployeeUpdatedAt',   formatLongDate(record.updated_at));
 
   modal.classList.add('show');
 }
@@ -1535,6 +2190,7 @@ function openAddEmployeeModal() {
   const modal = document.getElementById('addEmployeeModal');
   if (!modal) return;
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
+  modal.querySelectorAll('select').forEach((el) => (el.value = ''));
   modal.classList.add('show');
 }
 
@@ -1703,6 +2359,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initLoadingSkeletons();
 
   await loadTableData();
+  startRealtimeTableRefresh();
   bindImportControls();
   bindExportControls();
   bindAddButtons();
@@ -1720,6 +2377,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 });
+
+window.addEventListener('beforeunload', stopRealtimeTableRefresh);
 // ============================================================
 // LIVE RFID UID AUTO-FETCH FOR ADD STUDENT MODAL
 // ============================================================

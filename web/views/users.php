@@ -18,6 +18,10 @@ require_once __DIR__ . '/../api/csrf.php';
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Users | FCPC Attendance Tracker</title>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="apple-touch-icon" href="images/favicon.ico" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
@@ -535,8 +539,8 @@ require_once __DIR__ . '/../api/csrf.php';
     set('viewUserEmail',          record.email);
     set('viewUserRole',           record.role);
     set('viewUserStatus',         record.is_active ? 'Active' : 'Inactive');
-    setText('viewUserCreatedAt',  record.created_at);
-    setText('viewUserUpdatedAt',  record.updated_at);
+    setText('viewUserCreatedAt',  formatLongDate(record.created_at));
+    setText('viewUserUpdatedAt',  formatLongDate(record.updated_at));
 
     modal.classList.add('show');
   };

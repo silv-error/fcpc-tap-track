@@ -23,6 +23,10 @@ require_once __DIR__ . '/../api/csrf.php';
     }
   </script>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="apple-touch-icon" href="images/favicon.ico" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
@@ -40,8 +44,8 @@ require_once __DIR__ . '/../api/csrf.php';
         <img src="images/default-logo.png" alt="Default Logo" />
       </div>
       <div class="sidebar-user-info">
-        <h3>User, Test</h3>
-        <p>Administrator</p>
+        <h3><?= htmlspecialchars($_SESSION['full_name'] ?? 'User') ?></h3>
+        <p><?= htmlspecialchars($_SESSION['role'] ?? 'Administrator') ?></p>
       </div>
     </div>
 

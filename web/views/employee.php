@@ -23,6 +23,10 @@ require_once __DIR__ . '/../api/csrf.php';
     }
   </script>
   <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="apple-touch-icon" href="images/favicon.ico" />
+  <meta name="theme-color" content="#ffffff" />
   <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
 </head>
 <body>
@@ -38,8 +42,8 @@ require_once __DIR__ . '/../api/csrf.php';
         <img src="images/default-logo.png" alt="Default Logo" />
       </div>
       <div class="sidebar-user-info">
-        <h3>User, Test</h3>
-        <p>Administrator</p>
+        <h3><?= htmlspecialchars($_SESSION['full_name'] ?? 'User') ?></h3>
+        <p><?= htmlspecialchars($_SESSION['role'] ?? 'Administrator') ?></p>
       </div>
     </div>
 
@@ -115,7 +119,7 @@ require_once __DIR__ . '/../api/csrf.php';
 
           <div class="filter-group">
             <label for="departmentSelect">Department</label>
-            <select id="departmentSelect" class="filter-select">
+            <select id="departmentSelect" class="filter-select filter-select-department">
               <option value="all">All Departments</option>
             </select>
           </div>
@@ -334,12 +338,12 @@ require_once __DIR__ . '/../api/csrf.php';
         <input id="addEmployeeMiddleName" type="text" class="edit-input-active" placeholder="Middle name" />
       </div>
       <div class="overview-field">
-        <label for="addEmployeeSuffix">Suffix:</label>
-        <input id="addEmployeeSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
-      </div>
-      <div class="overview-field">
         <label for="addEmployeeLastName">Last Name:<span class="field-required">*</span></label>
         <input id="addEmployeeLastName" type="text" class="edit-input-active" placeholder="Last name" />
+      </div>
+      <div class="overview-field">
+        <label for="addEmployeeSuffix">Suffix:</label>
+        <input id="addEmployeeSuffix" type="text" class="edit-input-active" placeholder="e.g. Jr., III" />
       </div>
       <div class="overview-field">
         <label for="addEmployeeNumber">Employee No.:<span class="field-required">*</span></label>
@@ -347,7 +351,17 @@ require_once __DIR__ . '/../api/csrf.php';
       </div>
       <div class="overview-field overview-field-full">
         <label for="addEmployeeDepartment">Department:<span class="field-required">*</span></label>
-        <input id="addEmployeeDepartment" type="text" class="edit-input-active" placeholder="Department" />
+        <select id="addEmployeeDepartment" class="edit-input-active overview-select">
+            <option value="">Select Department</option>
+            <option value="College of Accountancy">College of Accountancy</option>
+            <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+            <option value="College of Business Management">College of Business Management</option>
+            <option value="College of Criminal Justice">College of Criminal Justice</option>
+            <option value="College of Education">College of Education</option>
+            <option value="College of Computer Studies">College of Computer Studies</option>
+            <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+            <option value="College of Engineering">College of Engineering</option>
+          </select>
       </div>
       <div class="overview-field overview-field-full">
         <label for="addEmployeePosition">Designation/Position:<span class="field-required">*</span></label>

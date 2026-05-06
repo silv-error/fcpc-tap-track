@@ -205,6 +205,12 @@ class DatabaseManager:
         person_id: int,
         person_type: str,
     ) -> Optional[Dict]:
+        """
+        Get the active (not yet timed out) attendance log for TODAY ONLY.
+        This ensures that if a person didn't time out yesterday,
+        a new time_in log is created for today instead of updating yesterday's log.
+        """
+        today = self.current_date()
         person_type = person_type.strip().capitalize()
 
         if person_type == "Student":
@@ -223,12 +229,13 @@ class DatabaseManager:
                 SELECT *
                 FROM attendance_logs
                 WHERE {column_name} = %s
+                AND log_date = %s
                 AND time_out IS NULL
                 ORDER BY id DESC
                 LIMIT 1
             """
 
-            cursor.execute(query, (person_id,))
+            cursor.execute(query, (person_id, today))
             return cursor.fetchone()
 
         except Error as error:

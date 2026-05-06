@@ -24,6 +24,63 @@ if (!$exportType || !in_array($exportType, ['students', 'employees', 'attendance
     exit;
 }
 
+function build_search_terms(string $search): array
+{
+    $search = strtolower(trim($search));
+    if ($search === '') return [];
+
+    $terms = [$search];
+
+    // "EMP-101 — Garcia, Ricardo" → also try just "EMP-101"
+    foreach ([' — ', ' - ', ' '] as $sep) {
+        if (str_contains($search, $sep)) {
+            $part = trim(explode($sep, $search, 2)[0]);
+            if ($part !== '') $terms[] = $part;
+            break;
+        }
+    }
+
+    return array_values(array_unique(array_filter($terms)));
+}
+
+/**
+ * Extract a clean identifier from the search string for use in the filename.
+ * "EMP-101 — Garcia, Ricardo (IT Dept)" → "EMP-101"
+ * "2024-0001 — Santos, Maria" → "2024-0001"
+ * If nothing useful is found, returns 'all'.
+ */
+function extract_filename_identifier(string $search): string
+{
+    $search = trim($search);
+    if ($search === '' || strtolower($search) === 'all') return 'all';
+
+    // Take the part before the first separator
+    foreach ([' — ', ' - '] as $sep) {
+        if (str_contains($search, $sep)) {
+            $search = trim(explode($sep, $search, 2)[0]);
+            break;
+        }
+    }
+
+    // Sanitize: keep alphanumeric, dash, underscore, dot
+    $clean = preg_replace('/[^a-zA-Z0-9.\-_]+/', '-', $search);
+    $clean = trim((string) $clean, '-._');
+
+    return $clean !== '' ? strtolower($clean) : 'all';
+}
+
+function sanitize_filename_piece(?string $value, string $fallback = 'all'): string
+{
+    $value = trim((string) ($value ?? ''));
+    if ($value === '') return $fallback;
+
+    $value = strtolower($value);
+    $value = preg_replace('/[^a-z0-9._-]+/', '-', $value);
+    $value = trim((string) $value, '-._');
+
+    return $value !== '' ? $value : $fallback;
+}
+
 try {
     $data    = [];
     $headers = [];
@@ -39,11 +96,18 @@ try {
         $headers = ['Student No.', 'RFID UID', 'Name', 'Course', 'Year Level', 'Department'];
 
         if (!empty($filters['search'])) {
-            $search = strtolower($filters['search']);
-            $data = array_filter($data, function ($row) use ($search) {
+            $searchTerms = build_search_terms((string) $filters['search']);
+            $data = array_filter($data, function ($row) use ($searchTerms) {
                 $fullName  = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
-                $studentNo = strtolower($row['student_number']);
-                return str_contains($fullName, $search) || str_contains($studentNo, $search);
+                $studentNo = strtolower((string) ($row['student_number'] ?? ''));
+                $rfid      = strtolower((string) ($row['rfid_uid'] ?? ''));
+
+                foreach ($searchTerms as $term) {
+                    if (str_contains($fullName, $term) || str_contains($studentNo, $term) || str_contains($rfid, $term)) {
+                        return true;
+                    }
+                }
+                return false;
             });
         }
 
@@ -57,7 +121,7 @@ try {
             $data = array_filter($data, fn($row) => strtolower($row['course']) === $course);
         }
 
-        if (!empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
+        if (!($filters['allYearLevels'] ?? false) && !empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
             $levels = array_map('strtolower', $filters['yearLevels']);
             $data = array_filter($data, fn($row) => in_array(strtolower($row['year_level']), $levels, true));
         }
@@ -73,11 +137,18 @@ try {
         $headers = ['Employee No.', 'RFID UID', 'Name', 'Position', 'Department'];
 
         if (!empty($filters['search'])) {
-            $search = strtolower($filters['search']);
-            $data = array_filter($data, function ($row) use ($search) {
+            $searchTerms = build_search_terms((string) $filters['search']);
+            $data = array_filter($data, function ($row) use ($searchTerms) {
                 $fullName = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
-                $empNo    = strtolower($row['employee_number']);
-                return str_contains($fullName, $search) || str_contains($empNo, $search);
+                $empNo    = strtolower((string) ($row['employee_number'] ?? ''));
+                $rfid     = strtolower((string) ($row['rfid_uid'] ?? ''));
+
+                foreach ($searchTerms as $term) {
+                    if (str_contains($fullName, $term) || str_contains($empNo, $term) || str_contains($rfid, $term)) {
+                        return true;
+                    }
+                }
+                return false;
             });
         }
 
@@ -124,16 +195,25 @@ try {
         $headers = ['Date', 'ID', 'Name', 'Time In', 'Time Out'];
 
         if (!empty($filters['search'])) {
-            $search = strtolower($filters['search']);
-            $data = array_filter($data, function ($row) use ($search) {
+            $searchTerms = build_search_terms((string) $filters['search']);
+            $data = array_filter($data, function ($row) use ($searchTerms) {
                 $name = '';
                 if ($row['s_first_name']) {
                     $name = strtolower(trim($row['s_last_name'] . ', ' . $row['s_first_name']));
                 } elseif ($row['e_first_name']) {
                     $name = strtolower(trim($row['e_last_name'] . ', ' . $row['e_first_name']));
                 }
-                $refNum = strtolower($row['s_reference_number'] ?? $row['e_reference_number'] ?? '');
-                return str_contains($name, $search) || str_contains($refNum, $search);
+
+                $studentRef  = trim((string) ($row['s_reference_number'] ?? ''));
+                $employeeRef = trim((string) ($row['e_reference_number'] ?? ''));
+                $refNum      = strtolower($studentRef !== '' ? $studentRef : $employeeRef);
+
+                foreach ($searchTerms as $term) {
+                    if (str_contains($name, $term) || str_contains($refNum, $term)) {
+                        return true;
+                    }
+                }
+                return false;
             });
         }
 
@@ -157,6 +237,48 @@ try {
 
     $data = array_values($data);
 
+    // ── Build filename ────────────────────────────────────────────────────────
+    $datePart   = date('Ymd');
+    $searchRaw  = trim((string) ($filters['search'] ?? ''));
+    $identifier = extract_filename_identifier($searchRaw);
+
+    if ($exportType === 'students') {
+        $fileName = "student-{$identifier}-{$datePart}.xlsx";
+    } elseif ($exportType === 'employees') {
+        $fileName = "employee-{$identifier}-{$datePart}.xlsx";
+    } else {
+        // Attendance: build context from identifier + type + date range
+        $contextParts = [];
+
+        if ($identifier !== 'all') {
+            $contextParts[] = $identifier;
+        }
+
+        if (!empty($filters['userTypes']) && is_array($filters['userTypes'])) {
+            $types = array_filter(array_map('strtolower', $filters['userTypes']), fn($t) => $t !== 'all' && $t !== '');
+            $types = array_values(array_unique($types));
+            if (count($types) === 1) {
+                $contextParts[] = sanitize_filename_piece($types[0]);
+            }
+        }
+
+        $dateFrom = trim((string) ($filters['dateFrom'] ?? ''));
+        $dateTo   = trim((string) ($filters['dateTo']   ?? ''));
+        if ($dateFrom !== '' || $dateTo !== '') {
+            $rangeLabel     = ($dateFrom !== '' && $dateTo !== '')
+                ? "{$dateFrom}-to-{$dateTo}"
+                : ($dateFrom !== '' ? $dateFrom : $dateTo);
+            $contextParts[] = sanitize_filename_piece($rangeLabel);
+        }
+
+        if (empty($contextParts)) {
+            $contextParts[] = 'all';
+        }
+
+        $fileName = 'attendance-' . implode('-', $contextParts) . "-{$datePart}.xlsx";
+    }
+
+    // ── Build spreadsheet ─────────────────────────────────────────────────────
     $spreadsheet = new Spreadsheet();
     $sheet       = $spreadsheet->getActiveSheet();
 
@@ -191,8 +313,7 @@ try {
     $sheet->getRowDimension($row)->setRowHeight(15);
     $row++;
 
-    // ── Blank row ─────────────────────────────────────────────────────────────
-    $row++;
+    $row++; // blank
 
     // ── Title ─────────────────────────────────────────────────────────────────
     $sheet->setCellValue("A{$row}", "{$titleLabel} Records");
@@ -214,8 +335,7 @@ try {
     $sheet->getRowDimension($row)->setRowHeight(15);
     $row++;
 
-    // ── Blank row ─────────────────────────────────────────────────────────────
-    $row++;
+    $row++; // blank
 
     // ── Table headers ─────────────────────────────────────────────────────────
     $headerRow = $row;
@@ -316,8 +436,7 @@ try {
     }
 
     // ── Output ────────────────────────────────────────────────────────────────
-    $writer   = new Xlsx($spreadsheet);
-    $fileName = "{$exportType}-records-" . date('YmdHis') . '.xlsx';
+    $writer = new Xlsx($spreadsheet);
 
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header("Content-Disposition: attachment; filename=\"{$fileName}\"");
