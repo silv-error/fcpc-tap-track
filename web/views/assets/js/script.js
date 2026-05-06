@@ -203,6 +203,10 @@ function buildRowModel(pageType, record) {
         ],
         searchText: [record.reference_number, record.name, record.department, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
         department: escapeText(record.department),
+        program: escapeText(record.program || ''),
+        yearLevel: escapeText(record.year_level || ''),
+        strand: escapeText(record.strand || ''),
+        category: escapeText(record.category || ''),
         typeValue: escapeText(record.record_type),
         dateValue: normalizeDate(record.log_date),
       };
@@ -1286,17 +1290,19 @@ function getExportModalBody(pageType, rows) {
         </div>
  
         <div class="export-field export-field-full">
-          <label>User Type</label>
+          <label>Type</label>
           <div class="export-checkbox-row">
             ${['All', 'Student', 'Employee'].map((value) => `
               <label class="export-checkbox">
-                <input type="checkbox" name="exportUserType" value="${value}" />
+                <input type="checkbox" name="exportUserType" value="${value}" onchange="updateAttendanceTypeFilters()" />
                 <span>${value}</span>
               </label>
             `).join('')}
           </div>
         </div>
  
+        <div id="attendanceDynamicFilters" class="export-field export-field-full"></div>
+
         <div class="export-section-label export-field-full">Sort By</div>
  
         <div class="export-field">
@@ -1345,6 +1351,9 @@ function openExportModal() {
   if (pageType === 'students') {
     // Initialize category-based filter controls
     updateExportFiltersForCategory('all');
+  } else if (pageType === 'attendance') {
+    // Initialize attendance dynamic filters (ensure checkboxes trigger proper UI)
+    updateAttendanceTypeFilters();
   }
 
   modal.classList.add('show');
@@ -1425,6 +1434,120 @@ function updateYearLevelOptions(category) {
   });
 }
 
+function getStudentFiltersFragment() {
+  return `
+    <div class="export-section-label export-field-full">Student Filters</div>
+
+    <div class="export-field export-filter-wrapper" data-filter="category">
+      <label for="exportCategorySelect">Category</label>
+      <select id="exportCategorySelect" class="export-control export-select" onchange="updateExportFiltersForCategory(this.value)">
+        <option value="all">All</option>
+        <option value="Basic Education">Basic Education</option>
+        <option value="Tertiary">Tertiary</option>
+        <option value="Graduate School">Graduate School</option>
+      </select>
+    </div>
+
+    <div class="export-field export-filter-wrapper" data-filter="department">
+      <label for="exportDepartmentSelect">Department</label>
+      <select id="exportDepartmentSelect" class="export-control export-select">
+        <option value="all">All Departments</option>
+        <option value="College of Accountancy">College of Accountancy</option>
+        <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+        <option value="College of Business Management">College of Business Management</option>
+        <option value="College of Criminal Justice">College of Criminal Justice</option>
+        <option value="College of Education">College of Education</option>
+        <option value="College of Computer Studies">College of Computer Studies</option>
+        <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+        <option value="College of Engineering">College of Engineering</option>
+        <option value="Basic Education">Basic Education</option>
+        <option value="Senior High School (Academic)">Senior High School (Academic)</option>
+        <option value="Senior High School (Technical-Vocational)">Senior High School (Technical-Vocational)</option>
+        <option value="Senior High School (Information and Communication Technology)">Senior High School (Information and Communication Technology)</option>
+        <option value="Senior High School (Agriculture and Fishery Arts)">Senior High School (Agriculture and Fishery Arts)</option>
+        <option value="Senior High School (Arts and Design)">Senior High School (Arts and Design)</option>
+      </select>
+      <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
+    </div>
+
+    <div class="export-field export-filter-wrapper" data-filter="program">
+      <label for="exportProgramSelect">Program</label>
+      <select id="exportProgramSelect" class="export-control export-select">
+        <option value="all">All Programs</option>
+        <option value="Bachelor of Science in Accountancy">Bachelor of Science in Accountancy</option>
+        <option value="Bachelor of Science in Management Accounting">Bachelor of Science in Management Accounting</option>
+        <option value="Bachelor of Science in Accounting Information System">Bachelor of Science in Accounting Information System</option>
+        <option value="Bachelor of Science in Internal Auditing">Bachelor of Science in Internal Auditing</option>
+        <option value="Bachelor of Science in Nursing">Bachelor of Science in Nursing</option>
+        <option value="Kindergarten">Kindergarten</option>
+        <option value="Elementary">Elementary</option>
+        <option value="Senior High School">Senior High School</option>
+      </select>
+      <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
+    </div>
+
+    <div class="export-field export-filter-wrapper" data-filter="yearLevel">
+      <label for="exportYearLevelSelect">Year Level</label>
+      <select id="exportYearLevelSelect" class="export-control export-select">
+        <option value="all">All Year Levels</option>
+      </select>
+      <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
+    </div>
+
+    <div class="export-field export-filter-wrapper" data-filter="strand">
+      <label for="exportStrandSelect">Strand</label>
+      <select id="exportStrandSelect" class="export-control export-select">
+        <option value="all">All Strands</option>
+        <option value="General Academic Strand (GAS)">General Academic Strand (GAS)</option>
+        <option value="Accountancy, Business and Management (ABM)">Accountancy, Business and Management (ABM)</option>
+        <option value="Humanities and Social Sciences Strand (HUMSS)">Humanities and Social Sciences Strand (HUMSS)</option>
+        <option value="Science, Technology, Engineering, and Mathematics Strand (STEM)">Science, Technology, Engineering, and Mathematics Strand (STEM)</option>
+      </select>
+      <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
+    </div>
+  `;
+}
+
+function updateAttendanceTypeFilters() {
+  const container = document.getElementById('attendanceDynamicFilters');
+  if (!container) return;
+
+  const checked = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value.toLowerCase());
+
+  // Clear container
+  container.innerHTML = '';
+
+  // If Employee selected, show department filter (reuse department select)
+  if (checked.includes('employee')) {
+    const empHtml = `
+      <div class="export-section-label export-field-full">Employee Filters</div>
+      <div class="export-field">
+        <label for="exportDepartmentSelect">Department</label>
+        <select id="exportDepartmentSelect" class="export-control export-select">
+          <option value="all">All Departments</option>
+          <option value="College of Accountancy">College of Accountancy</option>
+          <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
+          <option value="College of Business Management">College of Business Management</option>
+          <option value="College of Criminal Justice">College of Criminal Justice</option>
+          <option value="College of Education">College of Education</option>
+          <option value="College of Computer Studies">College of Computer Studies</option>
+          <option value="College of Arts and Sciences">College of Arts and Sciences</option>
+          <option value="College of Engineering">College of Engineering</option>
+        </select>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', empHtml);
+  }
+
+  // If Student selected, inject the same student filters and initialize
+  if (checked.includes('student')) {
+    container.insertAdjacentHTML('beforeend', getStudentFiltersFragment());
+    // Initialize year level options and filter state for inserted controls
+    updateYearLevelOptions(document.getElementById('exportCategorySelect')?.value || 'all');
+    updateExportFiltersForCategory(document.getElementById('exportCategorySelect')?.value || 'all');
+  }
+}
+
 function updateExportFiltersForCategory(category) {
   const departmentSelect = document.getElementById('exportDepartmentSelect');
   const programSelect = document.getElementById('exportProgramSelect');
@@ -1485,16 +1608,33 @@ function updateExportFiltersForCategory(category) {
     updateFilterStatus(filters.yearLevel, true);
     updateFilterStatus(filters.strand, true);
   } else if (category === 'Basic Education') {
-    // Department disabled, others enabled
-    disableSelect(departmentSelect);
-    enableSelect(programSelect);
+    // Basic Education: Program not applicable; Year Level enabled.
+    enableSelect(departmentSelect);
+    disableSelect(programSelect);
     enableSelect(yearLevelSelect);
-    enableSelect(strandSelect);
 
-    updateFilterStatus(filters.department, false, 'Not applicable for Basic Education');
-    updateFilterStatus(filters.program, true);
+    // Strand only applies for Grade 11 and Grade 12
+    const updateStrandAvailability = () => {
+      const yl = (yearLevelSelect.value || '').toLowerCase();
+      const strandApplicable = yl === 'grade 11' || yl === 'grade 12';
+      if (strandApplicable) {
+        enableSelect(strandSelect);
+        updateFilterStatus(filters.strand, true);
+      } else {
+        disableSelect(strandSelect);
+        updateFilterStatus(filters.strand, false, 'Available for Grade 11/12 only');
+      }
+    };
+
+    // Initialize strand availability and wire change handler
+    updateStrandAvailability();
+    if (yearLevelSelect) {
+      yearLevelSelect.onchange = updateStrandAvailability;
+    }
+
+    updateFilterStatus(filters.department, true);
+    updateFilterStatus(filters.program, false, 'Not applicable for Basic Education');
     updateFilterStatus(filters.yearLevel, true);
-    updateFilterStatus(filters.strand, true);
   } else if (category === 'Tertiary') {
     // Department, Program, Year Level enabled; Strand disabled
     enableSelect(departmentSelect);
@@ -1696,6 +1836,28 @@ function collectExportRows(pageType) {
       if (dateFrom && model.dateValue < dateFrom) return false;
       if (dateTo && model.dateValue > dateTo) return false;
       if (!isAllSelected && !selectedTypes.includes(modelType)) return false;
+
+      // If filtering by employee-specific fields
+      const employeeDeptVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
+
+      // If filtering by student-specific fields
+      const studentCategoryVal = (document.getElementById('exportCategorySelect')?.value || 'all').toLowerCase();
+      const studentDeptVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
+      const studentProgramVal = (document.getElementById('exportProgramSelect')?.value || 'all').toLowerCase();
+      const studentYearVal = (document.getElementById('exportYearLevelSelect')?.value || 'all').toLowerCase();
+      const studentStrandVal = (document.getElementById('exportStrandSelect')?.value || 'all').toLowerCase();
+
+      // Apply employee department filter only for employee records
+      if (modelType === 'employee' && employeeDeptVal !== 'all' && model.department.toLowerCase() !== employeeDeptVal) return false;
+
+      // Apply student filters only for student records
+      if (modelType === 'student') {
+        if (studentCategoryVal !== 'all' && (model.category || '').toLowerCase() !== studentCategoryVal) return false;
+        if (studentDeptVal !== 'all' && (model.department || '').toLowerCase() !== studentDeptVal) return false;
+        if (studentProgramVal !== 'all' && ((model.program || '').toLowerCase() !== studentProgramVal)) return false;
+        if (studentYearVal !== 'all' && ((model.yearLevel || '').toLowerCase() !== studentYearVal)) return false;
+        if (studentStrandVal !== 'all' && ((model.strand || '').toLowerCase() !== studentStrandVal)) return false;
+      }
     }
 
     return true;
@@ -1739,6 +1901,13 @@ async function handleExport() {
     filters.dateFrom = document.getElementById('exportDateFrom')?.value || '';
     filters.dateTo = document.getElementById('exportDateTo')?.value || '';
     filters.userTypes = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((input) => input.value);
+
+    // Include optional attendance-specific filters (employee or student)
+    filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
+    filters.category = document.getElementById('exportCategorySelect')?.value || 'all';
+    filters.program = document.getElementById('exportProgramSelect')?.value || 'all';
+    filters.yearLevel = document.getElementById('exportYearLevelSelect')?.value || 'all';
+    filters.strand = document.getElementById('exportStrandSelect')?.value || 'all';
   }
 
   const formData = new FormData();
