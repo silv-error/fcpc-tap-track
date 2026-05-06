@@ -68,7 +68,7 @@ class AttendanceBackend:
 
         if person_type == "Student":
             print(f"ID Number  : {person.get('student_number', 'N/A')}")
-            print(f"Course     : {person.get('course', 'N/A')}")
+            print(f"Program    : {person.get('program', 'N/A')}")
             print(f"Year Level : {person.get('year_level', 'N/A')}")
 
         elif person_type == "Employee":

@@ -100,28 +100,30 @@ CREATE TABLE `rfid_scan_logs` (
 --
 
 CREATE TABLE `students` (
-  `id` int(11) NOT NULL,
-  `student_number` varchar(50) NOT NULL,
-  `last_name` varchar(100) NOT NULL,
-  `first_name` varchar(100) NOT NULL,
-  `middle_name` varchar(100) DEFAULT NULL,
-  `suffix` varchar(10) DEFAULT NULL,
-  `course` varchar(100) DEFAULT NULL,
-  `year_level` varchar(50) DEFAULT NULL,
-  `department` varchar(100) DEFAULT NULL,
-  `rfid_uid` varchar(100) NOT NULL,
-  `is_active` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` datetime DEFAULT current_timestamp(),
-  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+  `id`             int(11)       NOT NULL AUTO_INCREMENT,
+  `student_number` varchar(50)   NOT NULL,
+  `category`       varchar(50)   DEFAULT NULL,
+  `last_name`      varchar(100)  NOT NULL,
+  `first_name`     varchar(100)  NOT NULL,
+  `middle_name`    varchar(100)  DEFAULT NULL,
+  `suffix`         varchar(10)   DEFAULT NULL,
+  `program`         varchar(100)  DEFAULT NULL,
+  `year_level`     varchar(50)   DEFAULT NULL,
+  `strand`         varchar(150)  DEFAULT NULL,
+  `department`     varchar(100)  DEFAULT NULL,
+  `rfid_uid`       varchar(255)  DEFAULT NULL,
+  `is_active`      tinyint(1)    NOT NULL DEFAULT 1,
+  `created_at`     datetime      DEFAULT current_timestamp(),
+  `updated_at`     datetime      DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `student_number` (`student_number`),
+  UNIQUE KEY `rfid_uid` (`rfid_uid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
-ALTER TABLE `students` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
 
 --
 -- Dumping data for table `students`
 --
-
-INSERT INTO `students` (`id`, `student_number`, `last_name`, `first_name`, `middle_name`, `suffix`, `course`, `year_level`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
+INSERT INTO `students` (`id`, `student_number`, `last_name`, `first_name`, `middle_name`, `suffix`, `program`, `year_level`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
 (1, '2024-0001', 'Santos', 'Maria', 'Clara', NULL, 'BSIT', '2nd Year', 'CICS', 'A1B2C3D4', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03'),
 (2, '2024-0002', 'Reyes', 'Juan', 'Luna', NULL, 'BSCS', '1st Year', 'CICS', 'E5F6G7H8', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03');
 

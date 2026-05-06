@@ -45,7 +45,7 @@ function handle_get(mysqli $con): void
             first_name,
             middle_name,
             suffix,
-            course,
+            program,
             year_level,
             department,
             rfid_uid,
@@ -71,7 +71,7 @@ function handle_get(mysqli $con): void
                     $student['middle_name'],
                     $student['suffix'],
                 ),
-                'course'         => $student['course'] ?: '-',
+                'program'         => $student['program'] ?: '-',
                 'year_level'     => $student['year_level'] ?: '-',
                 'department'     => $student['department'] ?: '-',
                 'is_active'      => (bool) $student['is_active'],
@@ -231,7 +231,7 @@ function handle_add(mysqli $con): void
     $middleName    = trim($body['middle_name'] ?? '');
     $lastName      = trim($body['last_name'] ?? '');
     $studentNumber = trim($body['student_number'] ?? '');
-    $course        = trim($body['course'] ?? '');
+    $program        = trim($body['program'] ?? '');
     $yearLevel     = trim($body['year_level'] ?? '');
     $department    = trim($body['department'] ?? '');
     $rfidUid       = trim($body['rfid_uid'] ?? '') ?: null;
@@ -250,8 +250,8 @@ function handle_add(mysqli $con): void
         $errors[] = 'Student number is required.';
     }
 
-    if ($course === '') {
-        $errors[] = 'Course is required.';
+    if ($program === '') {
+        $errors[] = 'Program is required.';
     }
 
     if ($yearLevel === '') {
@@ -311,7 +311,7 @@ function handle_add(mysqli $con): void
                 first_name,
                 middle_name,
                 last_name,
-                course,
+                program,
                 year_level,
                 department,
                 rfid_uid,
@@ -339,7 +339,7 @@ function handle_add(mysqli $con): void
         $firstName,
         $middleName,
         $lastName,
-        $course,
+        $program,
         $yearLevel,
         $department,
         $rfidUid,
@@ -529,7 +529,7 @@ function handle_import(mysqli $con): void
                 first_name,
                 middle_name,
                 last_name,
-                course,
+                program,
                 year_level,
                 department,
                 rfid_uid,
@@ -572,7 +572,7 @@ function handle_import(mysqli $con): void
         }
 
         $middleName = $get($row, 'middle_name') ?: null;
-        $course     = $get($row, 'course');
+        $program     = $get($row, 'program');
         $yearLevel  = $get($row, 'year_level');
         $department = $get($row, 'department');
         $rfidUid    = $get($row, 'rfid_uid') ?: null;
@@ -619,7 +619,7 @@ function handle_import(mysqli $con): void
             $firstName,
             $middleName,
             $lastName,
-            $course,
+            $program,
             $yearLevel,
             $department,
             $rfidUid,

@@ -88,12 +88,12 @@ try {
     if ($exportType === 'students') {
         $sql = "
             SELECT id, student_number, rfid_uid, last_name, first_name, middle_name,
-                   course, year_level, department, created_at
+                   program, year_level, department, created_at
             FROM students
             ORDER BY last_name ASC, first_name ASC
         ";
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Student No.', 'RFID UID', 'Name', 'Course', 'Year Level', 'Department'];
+        $headers = ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'];
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -116,9 +116,9 @@ try {
             $data = array_filter($data, fn($row) => strtolower($row['department']) === $dept);
         }
 
-        if (!empty($filters['course']) && $filters['course'] !== 'all') {
-            $course = strtolower($filters['course']);
-            $data = array_filter($data, fn($row) => strtolower($row['course']) === $course);
+        if (!empty($filters['program']) && $filters['program'] !== 'all') {
+            $program = strtolower($filters['program']);
+            $data = array_filter($data, fn($row) => strtolower($row['program']) === $program);
         }
 
         if (!($filters['allYearLevels'] ?? false) && !empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
@@ -367,7 +367,7 @@ try {
                 $record['student_number'],
                 $record['rfid_uid'] ?: '-',
                 $name,
-                $record['course'],
+                $record['program'],
                 $record['year_level'],
                 $record['department'],
             ];

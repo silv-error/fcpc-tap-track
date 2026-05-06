@@ -163,14 +163,14 @@ function buildRowModel(pageType, record) {
           escapeText(record.student_number),
           escapeText(record.rfid_uid),
           escapeText(record.name),
-          escapeText(record.course),
+          escapeText(record.program),
           escapeText(record.year_level),
           escapeText(record.department),
         ],
-        searchText: [record.student_number, record.rfid_uid, record.name, record.course, record.year_level, record.department].join(' ').toLowerCase(),
+        searchText: [record.student_number, record.rfid_uid, record.name, record.program, record.year_level, record.department].join(' ').toLowerCase(),
         department: escapeText(record.department),
         yearLevel: escapeText(record.year_level),
-        course: escapeText(record.course),
+        program: escapeText(record.program),
         typeValue: '',
         dateValue: normalizeDate(record.created_at),
         record,
@@ -501,7 +501,7 @@ function populateYearLevelSelect(rows) {
 }
 
 function populateCourseSelect(rows) {
-  const select = document.getElementById('courseSelect');
+  const select = document.getElementById('programSelect');
   if (!select) return;
 
   const existingValue = select.value || 'all';
@@ -559,7 +559,7 @@ function populateCourseSelect(rows) {
     'Visual Arts',
   ];
 
-  select.innerHTML = '<option value="all">All Courses</option>';
+  select.innerHTML = '<option value="all">All Programs</option>';
   courses.forEach((course) => {
     const option = document.createElement('option');
     option.value = course;
@@ -598,7 +598,7 @@ function applyFilters(resetToFirstPage = true) {
   const dateInput        = document.getElementById('dateInput');
   const departmentSelect = document.getElementById('departmentSelect');
   const yearLevelSelect  = document.getElementById('yearLevelSelect');
-  const courseSelect     = document.getElementById('courseSelect');
+  const programSelect     = document.getElementById('programSelect');
   const positionSelect   = document.getElementById('positionSelect');
 
   const searchVal     = (searchInput?.value      || '').trim().toLowerCase();
@@ -606,7 +606,7 @@ function applyFilters(resetToFirstPage = true) {
   const dateVal       = normalizeDate(dateInput?.value || '');
   const departmentVal = (departmentSelect?.value  || 'all').trim().toLowerCase();
   const yearLevelVal  = (yearLevelSelect?.value   || 'all').trim().toLowerCase();
-  const courseVal     = (courseSelect?.value      || 'all').trim().toLowerCase();
+  const programVal     = (programSelect?.value      || 'all').trim().toLowerCase();
   const positionVal   = (positionSelect?.value    || 'all').trim().toLowerCase();
 
   tableState.filteredRows = tableState.rows.filter((record) => {
@@ -617,7 +617,7 @@ function applyFilters(resetToFirstPage = true) {
       (!dateVal       || model.dateValue === dateVal)                                        &&
       (!departmentVal || departmentVal === 'all' || model.department.toLowerCase() === departmentVal) &&
       (!yearLevelVal  || yearLevelVal  === 'all' || model.yearLevel?.toLowerCase()  === yearLevelVal) &&
-      (!courseVal     || courseVal     === 'all' || model.course?.toLowerCase()     === courseVal)    &&
+      (!programVal     || programVal     === 'all' || model.program?.toLowerCase()     === programVal)    &&
       (!positionVal   || positionVal   === 'all' || model.position?.toLowerCase()   === positionVal)
     );
   });
@@ -629,7 +629,7 @@ function applyFilters(resetToFirstPage = true) {
 }
 
 function bindAdditionalFilterControls() {
-  ['yearLevelSelect', 'courseSelect', 'positionSelect'].forEach((id) => {
+  ['yearLevelSelect', 'programSelect', 'positionSelect'].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', () => {
       tableState.currentPage = 1;
       applyFilters();
@@ -910,12 +910,12 @@ function getExportHeadersAndRows(pageType, rows) {
   switch (pageType) {
     case 'students':
       return {
-        headers: ['Student No.', 'RFID UID', 'Name', 'Course', 'Year Level', 'Department'],
+        headers: ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'],
         rows: rows.map((record) => [
           escapeText(record.student_number),
           escapeText(record.rfid_uid),
           escapeText(record.name),
-          escapeText(record.course),
+          escapeText(record.program),
           escapeText(record.year_level),
           escapeText(record.department),
         ]),
@@ -954,7 +954,7 @@ function getExportSortValue(pageType, record, sortKey) {
     case 'students':
       if (sortKey === 'student_number') return escapeText(record.student_number);
       if (sortKey === 'department') return escapeText(record.department);
-      if (sortKey === 'course') return escapeText(record.course);
+      if (sortKey === 'program') return escapeText(record.program);
       if (sortKey === 'year_level') return escapeText(record.year_level);
       return parts.lastName;
     case 'employees':
@@ -1017,9 +1017,9 @@ function getExportModalBody(pageType, rows) {
         </div>
 
         <div class="export-field">
-          <label for="exportCourseSelect">Course</label>
-          <select id="exportCourseSelect" class="export-control export-select">
-            <option value="all">All Courses</option>
+          <label for="exportProgramSelect">Program</label>
+          <select id="exportProgramSelect" class="export-control export-select">
+            <option value="all">All Programs</option>
             <option value="Bachelor of Science in Accountancy">Bachelor of Science in Accountancy</option>
             <option value="Bachelor of Science in Management Accounting">Bachelor of Science in Management Accounting</option>
             <option value="Bachelor of Science in Accounting Information System">Bachelor of Science in Accounting Information System</option>
@@ -1098,7 +1098,7 @@ function getExportModalBody(pageType, rows) {
             <option value="last_name">Last Name (A-Z)</option>
             <option value="student_number">Student No. (A-Z)</option>
             <option value="department">Department (A-Z)</option>
-            <option value="course">Course (A-Z)</option>
+            <option value="program">Program (A-Z)</option>
             <option value="year_level">Year Level (A-Z)</option>
           </select>
         </div>
@@ -1490,7 +1490,7 @@ function collectExportRows(pageType) {
       const yearLevelValue = (model.yearLevel || '').toLowerCase();
 
       if (departmentVal !== 'all' && model.department.toLowerCase() !== departmentVal) return false;
-      if (courseVal !== 'all' && model.course.toLowerCase() !== courseVal) return false;
+      if (programVal !== 'all' && model.program.toLowerCase() !== programVal) return false;
       
       // If "All" is checked, skip year level filter; otherwise filter by selected year levels
       if (!allYearLevels && selectedYearLevels.length > 0 && !selectedYearLevels.includes(yearLevelValue)) {
@@ -1544,7 +1544,7 @@ async function handleExport() {
   if (pageType === 'students') {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
-    filters.course = document.getElementById('exportCourseSelect')?.value || 'all';
+    filters.program = document.getElementById('exportProgramSelect')?.value || 'all';
     const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
     const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
     filters.yearLevels = allYearLevels ? [] : selectedYearLevels;
@@ -1899,42 +1899,42 @@ const departmentCoursesMap = {
 // Update course options based on selected department
 function updateCourseOptionsForAddStudent() {
   const departmentSelect = document.getElementById('addStudentDepartment');
-  const courseSelect = document.getElementById('addStudentCourse');
+  const programSelect = document.getElementById('addStudentProgram');
 
-  if (!departmentSelect || !courseSelect) return;
+  if (!departmentSelect || !programSelect) return;
 
   const selectedDepartment = departmentSelect.value;
   const courses = departmentCoursesMap[selectedDepartment] || [];
 
-  // Clear and disable course select if no department is selected
+  // Clear and disable program select if no department is selected
   if (!selectedDepartment) {
-    courseSelect.innerHTML = '<option value="">Select Course</option>';
-    courseSelect.disabled = true;
-    courseSelect.classList.add('disabled');
+    programSelect.innerHTML = '<option value="">Select Program</option>';
+    programSelect.disabled = true;
+    programSelect.classList.add('disabled');
     return;
   }
 
-  // Enable course select and populate with filtered courses
-  courseSelect.disabled = false;
-  courseSelect.classList.remove('disabled');
-  courseSelect.innerHTML = '<option value="">Select Course</option>';
+  // Enable program select and populate with filtered courses
+  programSelect.disabled = false;
+  programSelect.classList.remove('disabled');
+  programSelect.innerHTML = '<option value="">Select Program</option>';
 
   courses.forEach((course) => {
     const option = document.createElement('option');
     option.value = course;
     option.textContent = course;
-    courseSelect.appendChild(option);
+    programSelect.appendChild(option);
   });
 }
 
 // Update year level options based on selected course
 function updateYearLevelOptionsForAddStudent() {
-  const courseSelect = document.getElementById('addStudentCourse');
+  const programSelect = document.getElementById('addStudentProgram');
   const yearLevelSelect = document.getElementById('addStudentYearLevel');
 
-  if (!courseSelect || !yearLevelSelect) return;
+  if (!programSelect || !yearLevelSelect) return;
 
-  const selectedCourse = courseSelect.value;
+  const selectedCourse = programSelect.value;
 
   // Default options for college (1st-4th Year)
   const collegeOptions = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
@@ -1972,14 +1972,14 @@ function updateYearLevelOptionsForAddStudent() {
 // Initialize course filtering when Add Student Modal is opened
 function initAddStudentModalCourseFiltering() {
   const departmentSelect = document.getElementById('addStudentDepartment');
-  const courseSelect = document.getElementById('addStudentCourse');
+  const programSelect = document.getElementById('addStudentProgram');
 
   if (departmentSelect) {
     departmentSelect.addEventListener('change', updateCourseOptionsForAddStudent);
   }
 
-  if (courseSelect) {
-    courseSelect.addEventListener('change', updateYearLevelOptionsForAddStudent);
+  if (programSelect) {
+    programSelect.addEventListener('change', updateYearLevelOptionsForAddStudent);
   }
 }
 
@@ -1995,7 +1995,7 @@ function openViewStudentModal(record) {
   setValue('viewStudentFirstName',  parts.firstName);
   setValue('viewStudentMiddleName', parts.middleName);
   setValue('viewStudentNumber',     record.student_number);
-  setValue('viewStudentCourse',     record.course);
+  setValue('viewStudentProgram',     record.program);
   setValue('viewStudentYearLevel',  record.year_level);
   setValue('viewStudentDepartment', record.department);
   setValue('viewStudentRfid',       record.rfid_uid);
@@ -2020,7 +2020,7 @@ function openEditStudentModal(record) {
   setValue('editStudentMiddleName', parts.middleName);
   setValue('editStudentLastName',   parts.lastName);
   setValue('editStudentNumber',     record.student_number);
-  setValue('editStudentCourse',     record.course);
+  setValue('editStudentProgram',     record.program);
   setValue('editStudentYearLevel',  record.year_level);
   setValue('editStudentDepartment', record.department);
   setValue('editStudentRfid',       record.rfid_uid !== '-' ? record.rfid_uid : '');
@@ -2058,12 +2058,12 @@ function openAddStudentModal() {
   modal.querySelectorAll('input').forEach((el) => (el.value = ''));
   modal.querySelectorAll('select').forEach((el) => (el.value = ''));
   
-  // Reset course field to disabled state
-  const courseSelect = document.getElementById('addStudentCourse');
-  if (courseSelect) {
-    courseSelect.disabled = true;
-    courseSelect.classList.add('disabled');
-    courseSelect.innerHTML = '<option value="">Select Course</option>';
+  // Reset program field to disabled state
+  const programSelect = document.getElementById('addStudentProgram');
+  if (programSelect) {
+    programSelect.disabled = true;
+    programSelect.classList.add('disabled');
+    programSelect.innerHTML = '<option value="">Select Program</option>';
   }
 
   // Reset year level to college defaults
@@ -2095,14 +2095,14 @@ async function saveAddStudent() {
     suffix:          get('addStudentSuffix'),
     last_name:       get('addStudentLastName'),
     student_number:  get('addStudentNumber'),
-    course:          get('addStudentCourse'),
+    program:          get('addStudentProgram'),
     year_level:      get('addStudentYearLevel'),
     department:      get('addStudentDepartment'),
     rfid_uid:        get('addStudentRfid'),
   };
 
-  if (!body.first_name || !body.last_name || !body.student_number || !body.course || !body.year_level || !body.department) {
-    showToast('First name, last name, student number, course, year level, and department are required.', 'error');
+  if (!body.first_name || !body.last_name || !body.student_number || !body.program || !body.year_level || !body.department) {
+    showToast('First name, last name, student number, program, year level, and department are required.', 'error');
     return;
   }
 

@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS students (
     middle_name TEXT,
     suffix TEXT,
 
-    course TEXT,
+    program TEXT,
     year_level TEXT,
     department TEXT,
     rfid_uid TEXT NOT NULL UNIQUE,
