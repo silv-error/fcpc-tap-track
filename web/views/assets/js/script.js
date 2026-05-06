@@ -1037,11 +1037,23 @@ function getExportModalBody(pageType, rows) {
           <div id="exportSearchResults" style="position:absolute; left:0; right:0; top:100%; margin-top:6px; border:1px solid #d0d7de; border-radius:8px; max-height:220px; overflow-y:auto; display:none; background:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;"></div>
         </div>
 
-        <div class="export-section-label export-field-full">Filter</div>
+        <div class="export-section-label export-field-full">Category</div>
 
-        <div class="export-field">
+        <div class="export-field export-field-full">
+          <label for="exportCategorySelect">Category</label>
+          <select id="exportCategorySelect" class="export-control export-select" onchange="updateExportFiltersForCategory(this.value)">
+            <option value="all">All</option>
+            <option value="Basic Education">Basic Education</option>
+            <option value="Tertiary">Tertiary</option>
+            <option value="Graduate School">Graduate School</option>
+          </select>
+        </div>
+
+        <div class="export-section-label export-field-full">Filters</div>
+
+        <div class="export-field export-filter-wrapper" data-filter="department">
           <label for="exportDepartmentSelect">Department</label>
-          <select id="exportDepartmentSelect" class="export-control export-select">
+          <select id="exportDepartmentSelect" class="export-control export-select" disabled>
             <option value="all">All Departments</option>
             <option value="College of Accountancy">College of Accountancy</option>
             <option value="College of Allied Medical Sciences">College of Allied Medical Sciences</option>
@@ -1058,11 +1070,12 @@ function getExportModalBody(pageType, rows) {
             <option value="Senior High School (Agriculture and Fishery Arts)">Senior High School (Agriculture and Fishery Arts)</option>
             <option value="Senior High School (Arts and Design)">Senior High School (Arts and Design)</option>
           </select>
+          <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
         </div>
 
-        <div class="export-field">
+        <div class="export-field export-filter-wrapper" data-filter="program">
           <label for="exportProgramSelect">Program</label>
-          <select id="exportProgramSelect" class="export-control export-select">
+          <select id="exportProgramSelect" class="export-control export-select" disabled>
             <option value="all">All Programs</option>
             <option value="Bachelor of Science in Accountancy">Bachelor of Science in Accountancy</option>
             <option value="Bachelor of Science in Management Accounting">Bachelor of Science in Management Accounting</option>
@@ -1116,22 +1129,46 @@ function getExportModalBody(pageType, rows) {
             <option value="Performing Arts">Performing Arts</option>
             <option value="Visual Arts">Visual Arts</option>
           </select>
+          <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
         </div>
 
-        <div class="export-field export-field-full" style="position:relative;">
-          <label>Year Level</label>
-          <div class="export-checkbox-row">
-            <label class="export-checkbox">
-              <input type="checkbox" id="exportYearLevelAll" class="export-year-level-all" />
-              <span>All</span>
-            </label>
-            ${['1st Year', '2nd Year', '3rd Year', '4th Year'].map((level) => `
-              <label class="export-checkbox">
-                <input type="checkbox" name="exportYearLevel" value="${level}" class="export-year-level-item" />
-                <span>${level}</span>
-              </label>
-            `).join('')}
-          </div>
+        <div class="export-field export-filter-wrapper" data-filter="yearLevel">
+          <label for="exportYearLevelSelect">Year Level</label>
+          <select id="exportYearLevelSelect" class="export-control export-select" disabled>
+            <option value="all">All Year Levels</option>
+            <option value="1st Year">1st Year</option>
+            <option value="2nd Year">2nd Year</option>
+            <option value="3rd Year">3rd Year</option>
+            <option value="4th Year">4th Year</option>
+            <option value="Pre-kinder 1">Pre-kinder 1</option>
+            <option value="Pre-kinder 2">Pre-kinder 2</option>
+            <option value="Kinder">Kinder</option>
+            <option value="Grade 1">Grade 1</option>
+            <option value="Grade 2">Grade 2</option>
+            <option value="Grade 3">Grade 3</option>
+            <option value="Grade 4">Grade 4</option>
+            <option value="Grade 5">Grade 5</option>
+            <option value="Grade 6">Grade 6</option>
+            <option value="Grade 7">Grade 7</option>
+            <option value="Grade 8">Grade 8</option>
+            <option value="Grade 9">Grade 9</option>
+            <option value="Grade 10">Grade 10</option>
+            <option value="Grade 11">Grade 11</option>
+            <option value="Grade 12">Grade 12</option>
+          </select>
+          <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
+        </div>
+
+        <div class="export-field export-filter-wrapper" data-filter="strand">
+          <label for="exportStrandSelect">Strand</label>
+          <select id="exportStrandSelect" class="export-control export-select" disabled>
+            <option value="all">All Strands</option>
+            <option value="General Academic Strand (GAS)">General Academic Strand (GAS)</option>
+            <option value="Accountancy, Business and Management (ABM)">Accountancy, Business and Management (ABM)</option>
+            <option value="Humanities and Social Sciences Strand (HUMSS)">Humanities and Social Sciences Strand (HUMSS)</option>
+            <option value="Science, Technology, Engineering, and Mathematics Strand (STEM)">Science, Technology, Engineering, and Mathematics Strand (STEM)</option>
+          </select>
+          <div class="export-filter-status" style="display:none; font-size:12px; color:#999; margin-top:4px;"></div>
         </div>
 
         <div class="export-section-label export-field-full">Sort By</div>
@@ -1306,8 +1343,8 @@ function openExportModal() {
   initExportSearchSuggestions(pageType, rows);
 
   if (pageType === 'students') {
-    initStudentExportCourseState();
-    initStudentExportYearLevelState();
+    // Initialize category-based filter controls
+    updateExportFiltersForCategory('all');
   }
 
   modal.classList.add('show');
@@ -1315,6 +1352,172 @@ function openExportModal() {
 
 function closeExportModal() {
   document.getElementById('exportModal')?.classList.remove('show');
+}
+
+function updateYearLevelOptions(category) {
+  const yearLevelSelect = document.getElementById('exportYearLevelSelect');
+  if (!yearLevelSelect) return;
+
+  let options = [];
+
+  if (category === 'all') {
+    options = [
+      { value: 'all', text: 'All Year Levels' },
+      { value: '1st Year', text: '1st Year' },
+      { value: '2nd Year', text: '2nd Year' },
+      { value: '3rd Year', text: '3rd Year' },
+      { value: '4th Year', text: '4th Year' },
+      { value: 'Pre-kinder 1', text: 'Pre-kinder 1' },
+      { value: 'Pre-kinder 2', text: 'Pre-kinder 2' },
+      { value: 'Kinder', text: 'Kinder' },
+      { value: 'Grade 1', text: 'Grade 1' },
+      { value: 'Grade 2', text: 'Grade 2' },
+      { value: 'Grade 3', text: 'Grade 3' },
+      { value: 'Grade 4', text: 'Grade 4' },
+      { value: 'Grade 5', text: 'Grade 5' },
+      { value: 'Grade 6', text: 'Grade 6' },
+      { value: 'Grade 7', text: 'Grade 7' },
+      { value: 'Grade 8', text: 'Grade 8' },
+      { value: 'Grade 9', text: 'Grade 9' },
+      { value: 'Grade 10', text: 'Grade 10' },
+      { value: 'Grade 11', text: 'Grade 11' },
+      { value: 'Grade 12', text: 'Grade 12' }
+    ];
+  } else if (category === 'Basic Education') {
+    options = [
+      { value: 'all', text: 'All Year Levels' },
+      { value: 'Pre-kinder 1', text: 'Pre-kinder 1' },
+      { value: 'Pre-kinder 2', text: 'Pre-kinder 2' },
+      { value: 'Kinder', text: 'Kinder' },
+      { value: 'Grade 1', text: 'Grade 1' },
+      { value: 'Grade 2', text: 'Grade 2' },
+      { value: 'Grade 3', text: 'Grade 3' },
+      { value: 'Grade 4', text: 'Grade 4' },
+      { value: 'Grade 5', text: 'Grade 5' },
+      { value: 'Grade 6', text: 'Grade 6' },
+      { value: 'Grade 7', text: 'Grade 7' },
+      { value: 'Grade 8', text: 'Grade 8' },
+      { value: 'Grade 9', text: 'Grade 9' },
+      { value: 'Grade 10', text: 'Grade 10' },
+      { value: 'Grade 11', text: 'Grade 11' },
+      { value: 'Grade 12', text: 'Grade 12' }
+    ];
+  } else if (category === 'Tertiary') {
+    options = [
+      { value: 'all', text: 'All Year Levels' },
+      { value: '1st Year', text: '1st Year' },
+      { value: '2nd Year', text: '2nd Year' },
+      { value: '3rd Year', text: '3rd Year' },
+      { value: '4th Year', text: '4th Year' }
+    ];
+  } else if (category === 'Graduate School') {
+    options = [
+      { value: 'all', text: 'All Year Levels' }
+    ];
+  }
+
+  yearLevelSelect.innerHTML = '';
+  options.forEach(opt => {
+    const optionEl = document.createElement('option');
+    optionEl.value = opt.value;
+    optionEl.textContent = opt.text;
+    yearLevelSelect.appendChild(optionEl);
+  });
+}
+
+function updateExportFiltersForCategory(category) {
+  const departmentSelect = document.getElementById('exportDepartmentSelect');
+  const programSelect = document.getElementById('exportProgramSelect');
+  const yearLevelSelect = document.getElementById('exportYearLevelSelect');
+  const strandSelect = document.getElementById('exportStrandSelect');
+
+  // Get all filter wrappers
+  const filters = {
+    department: document.querySelector('[data-filter="department"]'),
+    program: document.querySelector('[data-filter="program"]'),
+    yearLevel: document.querySelector('[data-filter="yearLevel"]'),
+    strand: document.querySelector('[data-filter="strand"]'),
+  };
+
+  // Reset all to disabled initially
+  departmentSelect.disabled = true;
+  programSelect.disabled = true;
+  yearLevelSelect.disabled = true;
+  strandSelect.disabled = true;
+
+  // Helper to enable select
+  const enableSelect = (selectEl) => {
+    selectEl.disabled = false;
+  };
+
+  // Helper to disable select
+  const disableSelect = (selectEl) => {
+    selectEl.disabled = true;
+    selectEl.value = 'all';
+  };
+
+  // Helper to show/hide status message
+  const updateFilterStatus = (wrapper, enabled, message = '') => {
+    if (!wrapper) return;
+    const status = wrapper.querySelector('.export-filter-status');
+    if (status) {
+      if (enabled) {
+        status.style.display = 'none';
+      } else {
+        status.textContent = message || 'Not applicable for this category';
+        status.style.display = 'block';
+      }
+    }
+  };
+
+  // Update year level options based on category
+  updateYearLevelOptions(category);
+
+  // Apply rules based on category
+  if (category === 'all') {
+    // All filters enabled
+    enableSelect(departmentSelect);
+    enableSelect(programSelect);
+    enableSelect(yearLevelSelect);
+    enableSelect(strandSelect);
+    updateFilterStatus(filters.department, true);
+    updateFilterStatus(filters.program, true);
+    updateFilterStatus(filters.yearLevel, true);
+    updateFilterStatus(filters.strand, true);
+  } else if (category === 'Basic Education') {
+    // Department disabled, others enabled
+    disableSelect(departmentSelect);
+    enableSelect(programSelect);
+    enableSelect(yearLevelSelect);
+    enableSelect(strandSelect);
+
+    updateFilterStatus(filters.department, false, 'Not applicable for Basic Education');
+    updateFilterStatus(filters.program, true);
+    updateFilterStatus(filters.yearLevel, true);
+    updateFilterStatus(filters.strand, true);
+  } else if (category === 'Tertiary') {
+    // Department, Program, Year Level enabled; Strand disabled
+    enableSelect(departmentSelect);
+    enableSelect(programSelect);
+    enableSelect(yearLevelSelect);
+    disableSelect(strandSelect);
+
+    updateFilterStatus(filters.department, true);
+    updateFilterStatus(filters.program, true);
+    updateFilterStatus(filters.yearLevel, true);
+    updateFilterStatus(filters.strand, false, 'Not applicable for Tertiary');
+  } else if (category === 'Graduate School') {
+    // Department, Program enabled; Year Level, Strand disabled
+    enableSelect(departmentSelect);
+    enableSelect(programSelect);
+    disableSelect(yearLevelSelect);
+    disableSelect(strandSelect);
+
+    updateFilterStatus(filters.department, true);
+    updateFilterStatus(filters.program, true);
+    updateFilterStatus(filters.yearLevel, false, 'Not applicable for Graduate School');
+    updateFilterStatus(filters.strand, false, 'Not applicable for Graduate School');
+  }
 }
 
 function initExportSearchSuggestions(pageType, rows) {
@@ -1448,71 +1651,6 @@ function selectExportSearchResult(result) {
   tableState.exportSearchQuery = input?.value || '';
 }
 
-function initStudentExportCourseState() {
-  const departmentSelect = document.getElementById('exportDepartmentSelect');
-  const courseSelect = document.getElementById('exportCourseSelect');
-  if (!departmentSelect || !courseSelect) return;
-
-  const allCourses = [...new Set(Object.values(departmentCoursesMap).flat())];
-
-  const renderCourseOptions = (courses, selectedValue) => {
-    courseSelect.innerHTML = '<option value="all">All Courses</option>';
-
-    courses.forEach((course) => {
-      const option = document.createElement('option');
-      option.value = course;
-      option.textContent = course;
-      courseSelect.appendChild(option);
-    });
-
-    if ([...courseSelect.options].some((option) => option.value === selectedValue)) {
-      courseSelect.value = selectedValue;
-    } else {
-      courseSelect.value = 'all';
-    }
-  };
-
-  const applyState = () => {
-    const selectedDepartment = departmentSelect.value || 'all';
-    const currentCourse = courseSelect.value || 'all';
-
-    if (selectedDepartment === 'all') {
-      renderCourseOptions(allCourses, currentCourse);
-      return;
-    }
-
-    renderCourseOptions(departmentCoursesMap[selectedDepartment] || [], currentCourse);
-  };
-
-  departmentSelect.addEventListener('change', applyState);
-  applyState();
-}
-
-function initStudentExportYearLevelState() {
-  const departmentSelect = document.getElementById('exportDepartmentSelect');
-  if (!departmentSelect) return;
-
-  const applyState = () => {
-    const selectedDepartment = (departmentSelect.value || '').toLowerCase();
-    const disableYearLevels = selectedDepartment === 'basic education' || selectedDepartment.startsWith('senior high school');
-    const allYearLevels = document.getElementById('exportYearLevelAll');
-    const yearLevelItems = [...document.querySelectorAll('input[name="exportYearLevel"]')];
-
-    if (allYearLevels) {
-      allYearLevels.disabled = disableYearLevels;
-      if (disableYearLevels) allYearLevels.checked = false;
-    }
-
-    yearLevelItems.forEach((input) => {
-      input.disabled = disableYearLevels;
-      if (disableYearLevels) input.checked = false;
-    });
-  };
-
-  departmentSelect.addEventListener('change', applyState);
-  applyState();
-}
-
 function collectExportRows(pageType) {
   const rows = Array.isArray(tableState.rows) ? tableState.rows.slice() : [];
   const searchVal = (document.getElementById('exportSearchInput')?.value || '').trim().toLowerCase();
@@ -1528,18 +1666,16 @@ function collectExportRows(pageType) {
 
     if (pageType === 'students') {
       const departmentVal = (document.getElementById('exportDepartmentSelect')?.value || 'all').toLowerCase();
-      const courseVal = (document.getElementById('exportCourseSelect')?.value || 'all').toLowerCase();
-      const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
-      const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value.toLowerCase());
+      const programVal = (document.getElementById('exportProgramSelect')?.value || 'all').toLowerCase();
+      const yearLevelVal = (document.getElementById('exportYearLevelSelect')?.value || 'all').toLowerCase();
+      const strandVal = (document.getElementById('exportStrandSelect')?.value || 'all').toLowerCase();
       const yearLevelValue = (model.yearLevel || '').toLowerCase();
+      const strandValue = (model.strand || '').toLowerCase();
 
       if (departmentVal !== 'all' && model.department.toLowerCase() !== departmentVal) return false;
       if (programVal !== 'all' && model.program.toLowerCase() !== programVal) return false;
-      
-      // If "All" is checked, skip year level filter; otherwise filter by selected year levels
-      if (!allYearLevels && selectedYearLevels.length > 0 && !selectedYearLevels.includes(yearLevelValue)) {
-        return false;
-      }
+      if (yearLevelVal !== 'all' && yearLevelValue !== yearLevelVal) return false;
+      if (strandVal !== 'all' && strandValue !== strandVal) return false;
     }
 
     if (pageType === 'employees') {
@@ -1587,12 +1723,13 @@ async function handleExport() {
 
   if (pageType === 'students') {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
+    filters.category = document.getElementById('exportCategorySelect')?.value || 'all';
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
     filters.program = document.getElementById('exportProgramSelect')?.value || 'all';
-    const allYearLevels = document.getElementById('exportYearLevelAll')?.checked || false;
-    const selectedYearLevels = [...document.querySelectorAll('input[name="exportYearLevel"]:checked')].map((input) => input.value);
-    filters.yearLevels = allYearLevels ? [] : selectedYearLevels;
-    filters.allYearLevels = allYearLevels;
+    const yearLevelVal = document.getElementById('exportYearLevelSelect')?.value || 'all';
+    const strandVal = document.getElementById('exportStrandSelect')?.value || 'all';
+    filters.yearLevel = yearLevelVal;
+    filters.strand = strandVal;
   } else if (pageType === 'employees') {
     filters.search = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';

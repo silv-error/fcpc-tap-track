@@ -1397,6 +1397,22 @@ body {
   accent-color: #1a237e;
 }
 
+.export-filter-wrapper {
+  transition: opacity 0.2s ease;
+}
+
+.export-filter-wrapper[disabled] {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.export-filter-status {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+  font-weight: 400;
+}
+
 .export-modal-actions {
   display: flex;
   justify-content: flex-end;
