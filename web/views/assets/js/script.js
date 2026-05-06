@@ -987,9 +987,10 @@ function getExportModalBody(pageType, rows) {
   if (pageType === 'students') {
     return `
       <div class="export-body-grid">
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" />
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <div id="exportSearchResults" style="position:absolute; left:0; right:0; top:100%; margin-top:6px; border:1px solid #d0d7de; border-radius:8px; max-height:220px; overflow-y:auto; display:none; background:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;"></div>
         </div>
 
         <div class="export-section-label export-field-full">Filter</div>
@@ -1073,7 +1074,7 @@ function getExportModalBody(pageType, rows) {
           </select>
         </div>
 
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label>Year Level</label>
           <div class="export-checkbox-row">
             <label class="export-checkbox">
@@ -1116,9 +1117,10 @@ function getExportModalBody(pageType, rows) {
   if (pageType === 'employees') {
     return `
       <div class="export-body-grid">
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Employee Number" />
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Employee Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <div id="exportSearchResults" style="position:absolute; left:0; right:0; top:100%; margin-top:6px; border:1px solid #d0d7de; border-radius:8px; max-height:220px; overflow-y:auto; display:none; background:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;"></div>
         </div>
 
         <div class="export-section-label export-field-full">Filter</div>
@@ -1177,23 +1179,31 @@ function getExportModalBody(pageType, rows) {
   if (pageType === 'attendance') {
     return `
       <div class="export-body-grid">
-        <div class="export-field export-field-full">
+        <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or ID Number" />
+          <input id="exportSearchInput" type="text" class="export-control"
+            placeholder="Search by Name or ID Number" autocomplete="off"
+            oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <div id="exportSearchResults"
+            style="position:absolute; left:0; right:0; top:100%; margin-top:6px;
+                   border:1px solid #d0d7de; border-radius:8px; max-height:220px;
+                   overflow-y:auto; display:none; background:#fff;
+                   box-shadow:0 8px 24px rgba(15,23,42,0.12); z-index:50;">
+          </div>
         </div>
-
+ 
         <div class="export-section-label export-field-full">Filter By (Date Range)</div>
-
+ 
         <div class="export-field">
           <label for="exportDateFrom">From</label>
           <input id="exportDateFrom" type="date" class="export-control" />
         </div>
-
+ 
         <div class="export-field">
           <label for="exportDateTo">To</label>
           <input id="exportDateTo" type="date" class="export-control" />
         </div>
-
+ 
         <div class="export-field export-field-full">
           <label>User Type</label>
           <div class="export-checkbox-row">
@@ -1205,9 +1215,9 @@ function getExportModalBody(pageType, rows) {
             `).join('')}
           </div>
         </div>
-
+ 
         <div class="export-section-label export-field-full">Sort By</div>
-
+ 
         <div class="export-field">
           <label for="exportPrimarySort">Primary Sort</label>
           <select id="exportPrimarySort" class="export-control export-select">
@@ -1217,7 +1227,7 @@ function getExportModalBody(pageType, rows) {
             <option value="type">Type</option>
           </select>
         </div>
-
+ 
         <div class="export-field">
           <label for="exportSortOrder">Order</label>
           <select id="exportSortOrder" class="export-control export-select">
@@ -1249,6 +1259,7 @@ function openExportModal() {
 
   title.textContent = `Export ${getExportPageLabel(pageType)} Records`;
   body.innerHTML = getExportModalBody(pageType, rows);
+  initExportSearchSuggestions(pageType, rows);
 
   if (pageType === 'students') {
     initStudentExportCourseState();
@@ -1260,6 +1271,137 @@ function openExportModal() {
 
 function closeExportModal() {
   document.getElementById('exportModal')?.classList.remove('show');
+}
+
+function initExportSearchSuggestions(pageType, rows) {
+  tableState.exportSearchPageType = pageType;
+  tableState.exportSearchRows = Array.isArray(rows) ? rows.slice() : [];
+  tableState.exportSearchQuery = '';
+
+  const input = document.getElementById('exportSearchInput');
+  if (input) {
+    input.value = '';
+    input.focus();
+  }
+
+  renderExportSearchSuggestions('');
+}
+
+function getExportSearchCandidate(record, pageType) {
+  if (pageType === 'students') {
+    return {
+      id: escapeText(record.student_number),
+      name: escapeText(record.name),
+      department: escapeText(record.department),
+      display: `${escapeText(record.student_number)} — ${escapeText(record.name)}${record.department && record.department !== '-' ? ` (${escapeText(record.department)})` : ''}`,
+      searchText: [record.student_number, record.name, record.department].join(' ').toLowerCase(),
+    };
+  }
+
+  if (pageType === 'employees') {
+    return {
+      id: escapeText(record.employee_number),
+      name: escapeText(record.name),
+      department: escapeText(record.department),
+      display: `${escapeText(record.employee_number)} — ${escapeText(record.name)}${record.department && record.department !== '-' ? ` (${escapeText(record.department)})` : ''}`,
+      searchText: [record.employee_number, record.name, record.department].join(' ').toLowerCase(),
+    };
+  }
+
+  if (pageType === 'attendance') {
+    return {
+      id: escapeText(record.reference_number),
+      name: escapeText(record.name),
+      department: escapeText(record.department),
+      display: `${escapeText(record.reference_number)} — ${escapeText(record.name)}${record.department && record.department !== '-' ? ` (${escapeText(record.department)})` : ''}`,
+      searchText: [record.reference_number, record.name, record.department, record.record_type, record.log_date].join(' ').toLowerCase(),
+    };
+  }
+
+  return null;
+}
+
+function renderExportSearchSuggestions(query) {
+  const box = document.getElementById('exportSearchResults');
+  if (!box) return;
+
+  const pageType = tableState.exportSearchPageType;
+  const rows = Array.isArray(tableState.exportSearchRows) ? tableState.exportSearchRows : [];
+  const normalizedQuery = String(query || '').trim().toLowerCase();
+
+  if (!normalizedQuery) {
+    box.innerHTML = '';
+    box.style.display = 'none';
+    return;
+  }
+
+  const matches = [];
+  rows.forEach((record) => {
+    const candidate = getExportSearchCandidate(record, pageType);
+    if (!candidate) return;
+
+    if (
+      candidate.searchText.includes(normalizedQuery) ||
+      candidate.display.toLowerCase().includes(normalizedQuery) ||
+      candidate.id.toLowerCase().includes(normalizedQuery) ||
+      candidate.name.toLowerCase().includes(normalizedQuery)
+    ) {
+      matches.push(candidate);
+    }
+  });
+
+  const uniqueMatches = [];
+  const seen = new Set();
+  matches.forEach((item) => {
+    const key = `${item.id}::${item.name}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    uniqueMatches.push(item);
+  });
+
+  const limitedMatches = uniqueMatches.slice(0, 12);
+
+  if (!limitedMatches.length) {
+    box.innerHTML = '<div style="padding:10px 14px;color:#888;font-size:13px;">No matching records found.</div>';
+    box.style.display = 'block';
+    return;
+  }
+
+  box.innerHTML = limitedMatches.map((item) => `
+    <div class="export-result-item"
+      style="padding:9px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee;"
+      onmouseenter="this.style.background='#e8eaf6'"
+      onmouseleave="this.style.background=''"
+      onclick="selectExportSearchResult(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+      <strong>${item.id}</strong> — ${item.name}
+      ${item.department && item.department !== '-' ? `<span style="color:#888;margin-left:6px;">(${item.department})</span>` : ''}
+    </div>
+  `).join('');
+  box.style.display = 'block';
+}
+
+function onExportSearchInput() {
+  const input = document.getElementById('exportSearchInput');
+  if (!input) return;
+
+  tableState.exportSearchQuery = input.value || '';
+  renderExportSearchSuggestions(tableState.exportSearchQuery);
+}
+
+function selectExportSearchResult(result) {
+  const input = document.getElementById('exportSearchInput');
+  const box = document.getElementById('exportSearchResults');
+
+  if (input) {
+    input.value = result.id && result.name ? `${result.id} — ${result.name}` : (result.id || result.name || '');
+  }
+
+  if (box) {
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
+
+  tableState.exportSearchQuery = input?.value || '';
 }
 
 function initStudentExportCourseState() {
@@ -1437,8 +1579,13 @@ async function handleExport() {
     const blob = await response.blob();
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
+
+    const contentDisposition = response.headers.get('content-disposition') || '';
+    const match = contentDisposition.match(/filename\*?=(?:UTF-8''|\")?([^\";]+)/i);
+    const serverFileName = match?.[1] ? decodeURIComponent(match[1].trim()) : '';
+
     link.href = url;
-    link.download = `${pageType}-records.xlsx`;
+    link.download = serverFileName || `${pageType}-records.xlsx`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
