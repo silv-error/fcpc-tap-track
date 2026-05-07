@@ -367,6 +367,10 @@ require_once __DIR__ . '/../api/csrf.php';
           </select>
       </div>
       <div class="overview-field overview-field-full">
+        <label for="addEmployeePosition">Designation/Position:<span class="field-required">*</span></label>
+        <input id="addEmployeePosition" type="text" class="edit-input-active" placeholder="e.g. Instructor" />
+      </div>
+      <div class="overview-field overview-field-full">
         <label for="addEmployeeRfid">RFID UID:</label>
         <div style="display: flex; gap: 8px; align-items: center;">
           <input id="addEmployeeRfid" type="text" class="edit-input-active" placeholder="Tap RFID card to scan..." readonly style="flex: 1;" />
