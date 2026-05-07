@@ -45,8 +45,10 @@ function handle_get(mysqli $con): void
             first_name,
             middle_name,
             suffix,
-            course,
+            category,
+            program,
             year_level,
+            strand,
             department,
             rfid_uid,
             is_active,
@@ -71,8 +73,10 @@ function handle_get(mysqli $con): void
                     $student['middle_name'],
                     $student['suffix'],
                 ),
-                'course'         => $student['course'] ?: '-',
+                'category'       => $student['category'] ?: '-',
+                'program'         => $student['program'] ?: '-',
                 'year_level'     => $student['year_level'] ?: '-',
+                'strand'         => $student['strand'] ?: '-',
                 'department'     => $student['department'] ?: '-',
                 'is_active'      => (bool) $student['is_active'],
                 'created_at'     => $student['created_at'],
@@ -140,6 +144,74 @@ function handle_get_latest_rfid_uid(mysqli $con): void
     ]);
 }
 
+function find_rfid_uid_owner(mysqli $con, string $rfidUid, ?string $excludeType = null, int $excludeId = 0): ?array
+{
+    $normalizedUid = trim($rfidUid);
+    if ($normalizedUid === '') {
+        return null;
+    }
+
+    $studentRows = fetch_all_rows_prepared(
+        $con,
+        "
+            SELECT id, student_number, last_name, first_name, middle_name, suffix
+            FROM students
+            WHERE UPPER(rfid_uid) = UPPER(?)
+            LIMIT 1
+        ",
+        's',
+        $normalizedUid,
+    );
+
+    if (!empty($studentRows)) {
+        $owner = $studentRows[0];
+        if (!(strtolower((string) $excludeType) === 'student' && (int) $owner['id'] === $excludeId)) {
+            return [
+                'type'       => 'Student',
+                'id'         => (int) $owner['id'],
+                'reference'  => (string) $owner['student_number'],
+                'name'       => format_display_name(
+                    (string) $owner['last_name'],
+                    (string) $owner['first_name'],
+                    $owner['middle_name'] ?? null,
+                    $owner['suffix'] ?? null,
+                ),
+            ];
+        }
+    }
+
+    $employeeRows = fetch_all_rows_prepared(
+        $con,
+        "
+            SELECT id, employee_number, last_name, first_name, middle_name, suffix
+            FROM employees
+            WHERE UPPER(rfid_uid) = UPPER(?)
+            LIMIT 1
+        ",
+        's',
+        $normalizedUid,
+    );
+
+    if (!empty($employeeRows)) {
+        $owner = $employeeRows[0];
+        if (!(strtolower((string) $excludeType) === 'employee' && (int) $owner['id'] === $excludeId)) {
+            return [
+                'type'       => 'Employee',
+                'id'         => (int) $owner['id'],
+                'reference'  => (string) $owner['employee_number'],
+                'name'       => format_display_name(
+                    (string) $owner['last_name'],
+                    (string) $owner['first_name'],
+                    $owner['middle_name'] ?? null,
+                    $owner['suffix'] ?? null,
+                ),
+            ];
+        }
+    }
+
+    return null;
+}
+
 // ── POST /api/students.php ────────────────────────────────────────────────────
 
 function handle_post(mysqli $con): void
@@ -162,10 +234,13 @@ function handle_add(mysqli $con): void
     $firstName     = trim($body['first_name'] ?? '');
     $middleName    = trim($body['middle_name'] ?? '');
     $lastName      = trim($body['last_name'] ?? '');
+    $suffix        = trim($body['suffix'] ?? '') ?: null;
     $studentNumber = trim($body['student_number'] ?? '');
-    $course        = trim($body['course'] ?? '');
-    $yearLevel     = trim($body['year_level'] ?? '');
-    $department    = trim($body['department'] ?? '');
+    $category      = trim($body['category'] ?? '');
+    $program        = trim($body['program'] ?? '') ?: null;
+    $yearLevel     = trim($body['year_level'] ?? '') ?: null;
+    $strand        = trim($body['strand'] ?? '') ?: null;
+    $department    = trim($body['department'] ?? '') ?: null;
     $rfidUid       = trim($body['rfid_uid'] ?? '') ?: null;
 
     $errors = [];
@@ -182,16 +257,8 @@ function handle_add(mysqli $con): void
         $errors[] = 'Student number is required.';
     }
 
-    if ($course === '') {
-        $errors[] = 'Course is required.';
-    }
-
-    if ($yearLevel === '') {
-        $errors[] = 'Year level is required.';
-    }
-
-    if ($department === '') {
-        $errors[] = 'Department is required.';
+    if ($category === '') {
+        $errors[] = 'Category is required.';
     }
 
     if ($errors) {
@@ -201,55 +268,40 @@ function handle_add(mysqli $con): void
         ], 422);
     }
 
-    if ($rfidUid !== null) {
-        $stmt = mysqli_prepare($con, "
-            SELECT id
-            FROM students
-            WHERE student_number = ? OR rfid_uid = ?
-            LIMIT 1
-        ");
-
-        if (!$stmt) {
-            error_log('Prepare failed: ' . mysqli_error($con));
-            json_response([
-                'success' => false,
-                'message' => 'A database error occurred.',
-            ], 500);
-        }
-
-        mysqli_stmt_bind_param($stmt, 'ss', $studentNumber, $rfidUid);
-    } else {
-        $stmt = mysqli_prepare($con, "
+    $duplicateStudentRows = fetch_all_rows_prepared(
+        $con,
+        "
             SELECT id
             FROM students
             WHERE student_number = ?
             LIMIT 1
-        ");
+        ",
+        's',
+        $studentNumber,
+    );
 
-        if (!$stmt) {
-            error_log('Prepare failed: ' . mysqli_error($con));
-            json_response([
-                'success' => false,
-                'message' => 'A database error occurred.',
-            ], 500);
-        }
-
-        mysqli_stmt_bind_param($stmt, 's', $studentNumber);
-    }
-
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_store_result($stmt);
-
-    if (mysqli_stmt_num_rows($stmt) > 0) {
-        mysqli_stmt_close($stmt);
-
+    if (!empty($duplicateStudentRows)) {
         json_response([
             'success' => false,
-            'message' => 'Student number or RFID UID already exists.',
+            'message' => 'Student number already exists.',
         ], 409);
     }
 
-    mysqli_stmt_close($stmt);
+    if ($rfidUid !== null) {
+        $rfidOwner = find_rfid_uid_owner($con, $rfidUid);
+        if ($rfidOwner !== null) {
+            json_response([
+                'success' => false,
+                'message' => sprintf(
+                    'RFID UID %s is already assigned to %s: %s (%s).',
+                    $rfidUid,
+                    $rfidOwner['type'],
+                    $rfidOwner['name'],
+                    $rfidOwner['reference'],
+                ),
+            ], 409);
+        }
+    }
 
     $stmt = mysqli_prepare($con, "
         INSERT INTO students
@@ -258,8 +310,11 @@ function handle_add(mysqli $con): void
                 first_name,
                 middle_name,
                 last_name,
-                course,
+                suffix,
+                category,
+                program,
                 year_level,
+                strand,
                 department,
                 rfid_uid,
                 is_active,
@@ -267,7 +322,7 @@ function handle_add(mysqli $con): void
                 updated_at
             )
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
     ");
 
     if (!$stmt) {
@@ -281,13 +336,16 @@ function handle_add(mysqli $con): void
 
     mysqli_stmt_bind_param(
         $stmt,
-        'ssssssss',
+        'sssssssssss',
         $studentNumber,
         $firstName,
         $middleName,
         $lastName,
-        $course,
+        $suffix,
+        $category,
+        $program,
         $yearLevel,
+        $strand,
         $department,
         $rfidUid,
     );
@@ -330,36 +388,19 @@ function handle_patch(mysqli $con): void
     }
 
     if ($rfidUid !== null) {
-        $stmt = mysqli_prepare($con, "
-            SELECT id
-            FROM students
-            WHERE rfid_uid = ? AND id != ?
-            LIMIT 1
-        ");
-
-        if (!$stmt) {
-            error_log('Prepare failed: ' . mysqli_error($con));
-
+        $rfidOwner = find_rfid_uid_owner($con, $rfidUid, 'student', $id);
+        if ($rfidOwner !== null) {
             json_response([
                 'success' => false,
-                'message' => 'A database error occurred.',
-            ], 500);
-        }
-
-        mysqli_stmt_bind_param($stmt, 'si', $rfidUid, $id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_store_result($stmt);
-
-        if (mysqli_stmt_num_rows($stmt) > 0) {
-            mysqli_stmt_close($stmt);
-
-            json_response([
-                'success' => false,
-                'message' => 'RFID UID is already assigned to another student.',
+                'message' => sprintf(
+                    'RFID UID %s is already assigned to %s: %s (%s).',
+                    $rfidUid,
+                    $rfidOwner['type'],
+                    $rfidOwner['name'],
+                    $rfidOwner['reference'],
+                ),
             ], 409);
         }
-
-        mysqli_stmt_close($stmt);
     }
 
     $stmt = mysqli_prepare($con, "
@@ -493,8 +534,11 @@ function handle_import(mysqli $con): void
                 first_name,
                 middle_name,
                 last_name,
-                course,
+                suffix,
+                category,
+                program,
                 year_level,
+                strand,
                 department,
                 rfid_uid,
                 is_active,
@@ -502,7 +546,7 @@ function handle_import(mysqli $con): void
                 updated_at
             )
         VALUES
-            (?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
+            (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW(), NOW())
     ");
 
     if (!$stmtDupWithRfid || !$stmtDupNoRfid || !$stmtInsert) {
@@ -536,9 +580,12 @@ function handle_import(mysqli $con): void
         }
 
         $middleName = $get($row, 'middle_name') ?: null;
-        $course     = $get($row, 'course');
-        $yearLevel  = $get($row, 'year_level');
-        $department = $get($row, 'department');
+        $suffix     = $get($row, 'suffix') ?: null;
+        $category   = $get($row, 'category') ?: null;
+        $program     = $get($row, 'program') ?: null;
+        $yearLevel  = $get($row, 'year_level') ?: null;
+        $strand     = $get($row, 'strand') ?: null;
+        $department = $get($row, 'department') ?: null;
         $rfidUid    = $get($row, 'rfid_uid') ?: null;
 
         if ($rfidUid !== null) {
@@ -578,13 +625,16 @@ function handle_import(mysqli $con): void
 
         mysqli_stmt_bind_param(
             $stmtInsert,
-            'ssssssss',
+            'sssssssssss',
             $studentNumber,
             $firstName,
             $middleName,
             $lastName,
-            $course,
+            $suffix,
+            $category,
+            $program,
             $yearLevel,
+            $strand,
             $department,
             $rfidUid,
         );

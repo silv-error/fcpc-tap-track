@@ -41,7 +41,14 @@ class DatabaseManager:
 
     @staticmethod
     def normalize_uid(rfid_uid: str) -> str:
-        return str(rfid_uid).strip().replace(" ", "").upper()
+        return (
+            str(rfid_uid)
+            .strip()
+            .replace(" ", "")
+            .replace("-", "")
+            .replace(":", "")
+            .upper()
+        )
 
     @staticmethod
     def format_full_name(person: Optional[Dict]) -> str:
@@ -69,6 +76,7 @@ class DatabaseManager:
 
     def get_all_students(self) -> List[Dict]:
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -87,13 +95,15 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to get students: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     def find_student_by_rfid_uid(self, rfid_uid: str) -> Optional[Dict]:
         normalized_uid = self.normalize_uid(rfid_uid)
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -102,7 +112,13 @@ class DatabaseManager:
                 """
                 SELECT *
                 FROM students
-                WHERE UPPER(rfid_uid) = UPPER(%s)
+                WHERE UPPER(
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(rfid_uid, ' ', ''),
+                        '-', ''),
+                    ':', '')
+                ) = %s
                 AND is_active = 1
                 LIMIT 1
                 """,
@@ -115,7 +131,48 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to find student by RFID UID: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
+            connection.close()
+
+    def find_student_index_by_rfid_uid(self, rfid_uid: str) -> Optional[int]:
+        normalized_uid = self.normalize_uid(rfid_uid)
+
+        connection = self.get_connection()
+        cursor = None
+
+        try:
+            cursor = connection.cursor(dictionary=True)
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM students
+                WHERE UPPER(
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(rfid_uid, ' ', ''),
+                        '-', ''),
+                    ':', '')
+                ) = %s
+                LIMIT 1
+                """,
+                (normalized_uid,),
+            )
+
+            student = cursor.fetchone()
+
+            if student:
+                return student["id"]
+
+            return None
+
+        except Error as error:
+            raise RuntimeError(f"Failed to check RFID UID owner: {error}")
+
+        finally:
+            if cursor:
+                cursor.close()
             connection.close()
 
     # ============================================================
@@ -124,6 +181,7 @@ class DatabaseManager:
 
     def get_all_employees(self) -> List[Dict]:
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -142,13 +200,15 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to get employees: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     def find_employee_by_rfid_uid(self, rfid_uid: str) -> Optional[Dict]:
         normalized_uid = self.normalize_uid(rfid_uid)
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -157,7 +217,13 @@ class DatabaseManager:
                 """
                 SELECT *
                 FROM employees
-                WHERE UPPER(rfid_uid) = UPPER(%s)
+                WHERE UPPER(
+                    REPLACE(
+                        REPLACE(
+                            REPLACE(rfid_uid, ' ', ''),
+                        '-', ''),
+                    ':', '')
+                ) = %s
                 AND is_active = 1
                 LIMIT 1
                 """,
@@ -170,7 +236,8 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to find employee by RFID UID: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     # ============================================================
@@ -205,11 +272,6 @@ class DatabaseManager:
         person_id: int,
         person_type: str,
     ) -> Optional[Dict]:
-        """
-        Get the active (not yet timed out) attendance log for TODAY ONLY.
-        This ensures that if a person didn't time out yesterday,
-        a new time_in log is created for today instead of updating yesterday's log.
-        """
         today = self.current_date()
         person_type = person_type.strip().capitalize()
 
@@ -221,6 +283,7 @@ class DatabaseManager:
             raise ValueError("Invalid person type. Must be Student or Employee.")
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -242,7 +305,8 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to get active attendance log: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     def get_today_attendance_log(
@@ -261,6 +325,7 @@ class DatabaseManager:
             raise ValueError("Invalid person type. Must be Student or Employee.")
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -281,7 +346,8 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to get today's attendance log: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     def create_time_in_log(
@@ -305,6 +371,7 @@ class DatabaseManager:
             raise ValueError("Invalid person type. Must be Student or Employee.")
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -341,7 +408,8 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to create time-in log: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     def update_time_out_log(self, attendance_log_id: int) -> str:
@@ -349,6 +417,7 @@ class DatabaseManager:
         current_time = self.current_time()
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -372,7 +441,8 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to update time-out log: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     # ============================================================
@@ -401,6 +471,7 @@ class DatabaseManager:
                 raise ValueError("Invalid person type. Must be Student or Employee.")
 
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -434,7 +505,8 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to log RFID scan: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     # ============================================================
@@ -443,6 +515,7 @@ class DatabaseManager:
 
     def get_recent_attendance_logs(self, limit: int = 20) -> List[Dict]:
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -457,8 +530,10 @@ class DatabaseManager:
                     students.first_name,
                     students.middle_name,
                     students.suffix,
-                    students.course,
+                    students.category,
+                    students.program,
                     students.year_level,
+                    students.strand,
                     students.department,
                     NULL AS position,
                     students.rfid_uid,
@@ -479,8 +554,10 @@ class DatabaseManager:
                     employees.first_name,
                     employees.middle_name,
                     employees.suffix,
-                    NULL AS course,
+                    NULL AS category,
+                    NULL AS program,
                     NULL AS year_level,
+                    NULL AS strand,
                     employees.department,
                     employees.position,
                     employees.rfid_uid,
@@ -508,11 +585,13 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to get recent attendance logs: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
     def get_recent_scan_logs(self, limit: int = 20) -> List[Dict]:
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -533,14 +612,29 @@ class DatabaseManager:
             raise RuntimeError(f"Failed to get recent scan logs: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
 
-    def save_rfid_uid_to_buffer(self, rfid_uid: str):
+    # ============================================================
+    # RFID UID BUFFER
+    # ============================================================
+
+    def save_rfid_uid_to_buffer(self, rfid_uid: str) -> Dict:
         normalized_uid = self.normalize_uid(rfid_uid)
         now = self.current_datetime()
 
+        used_by_student_id = self.find_student_index_by_rfid_uid(normalized_uid)
+        is_used = 1 if used_by_student_id is not None else 0
+
+        print("[RFID BUFFER DEBUG]")
+        print("Scanned UID:", normalized_uid)
+        print("Found student ID:", used_by_student_id)
+        print("Is used:", is_used)
+        print("Connected database:", self.database)
+
         connection = self.get_connection()
+        cursor = None
 
         try:
             cursor = connection.cursor(dictionary=True)
@@ -550,22 +644,33 @@ class DatabaseManager:
                 INSERT INTO rfid_uid_buffer (
                     rfid_uid,
                     is_used,
+                    used_by_student_id,
                     created_at
                 )
-                VALUES (%s, 0, %s)
+                VALUES (%s, %s, %s, %s)
                 """,
                 (
                     normalized_uid,
+                    is_used,
+                    used_by_student_id,
                     now,
                 ),
             )
 
             connection.commit()
 
+            return {
+                "rfid_uid": normalized_uid,
+                "is_used": is_used,
+                "used_by_student_id": used_by_student_id,
+                "created_at": now,
+            }
+
         except Error as error:
             connection.rollback()
             raise RuntimeError(f"Failed to save RFID UID to buffer: {error}")
 
         finally:
-            cursor.close()
+            if cursor:
+                cursor.close()
             connection.close()
