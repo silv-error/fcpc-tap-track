@@ -88,12 +88,22 @@ try {
     if ($exportType === 'students') {
         $sql = "
             SELECT id, student_number, rfid_uid, last_name, first_name, middle_name,
-                   course, year_level, department, created_at
+                   category, program, year_level, strand, department, created_at
             FROM students
             ORDER BY last_name ASC, first_name ASC
         ";
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Student No.', 'RFID UID', 'Name', 'Course', 'Year Level', 'Department'];
+        
+        // Determine which columns to export based on category
+        $exportCategory = $filters['category'] ?? 'all';
+        $includeStrand = $exportCategory === 'all' || $exportCategory === 'Basic Education';
+        
+        // Build headers based on category
+        if ($includeStrand) {
+            $headers = ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department', 'Strand'];
+        } else {
+            $headers = ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'];
+        }
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -111,19 +121,38 @@ try {
             });
         }
 
+        // Apply category filter
+        if (!empty($exportCategory) && $exportCategory !== 'all') {
+            $categoryLower = strtolower($exportCategory);
+            $data = array_filter($data, fn($row) => strtolower($row['category'] ?? '') === $categoryLower);
+        }
+
+        // Apply category-specific filter rules
+        if ($exportCategory === 'Basic Education') {
+            // Department filter not applicable for Basic Education
+            // But can still filter by Program, Year Level, and Strand if specified
+        } elseif ($exportCategory === 'Tertiary' || $exportCategory === 'Graduate School') {
+            // These categories use Department and Program, not Strand
+        }
+
         if (!empty($filters['department']) && $filters['department'] !== 'all') {
             $dept = strtolower($filters['department']);
             $data = array_filter($data, fn($row) => strtolower($row['department']) === $dept);
         }
 
-        if (!empty($filters['course']) && $filters['course'] !== 'all') {
-            $course = strtolower($filters['course']);
-            $data = array_filter($data, fn($row) => strtolower($row['course']) === $course);
+        if (!empty($filters['program']) && $filters['program'] !== 'all') {
+            $program = strtolower($filters['program']);
+            $data = array_filter($data, fn($row) => strtolower($row['program']) === $program);
         }
 
-        if (!($filters['allYearLevels'] ?? false) && !empty($filters['yearLevels']) && is_array($filters['yearLevels'])) {
-            $levels = array_map('strtolower', $filters['yearLevels']);
-            $data = array_filter($data, fn($row) => in_array(strtolower($row['year_level']), $levels, true));
+        if (!empty($filters['yearLevel']) && $filters['yearLevel'] !== 'all') {
+            $yearLevel = strtolower($filters['yearLevel']);
+            $data = array_filter($data, fn($row) => strtolower($row['year_level']) === $yearLevel);
+        }
+
+        if (!empty($filters['strand']) && $filters['strand'] !== 'all') {
+            $strand = strtolower($filters['strand']);
+            $data = array_filter($data, fn($row) => strtolower($row['strand'] ?? '') === $strand);
         }
 
     } elseif ($exportType === 'employees') {
@@ -363,14 +392,29 @@ try {
 
         if ($exportType === 'students') {
             $name    = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
-            $rowData = [
-                $record['student_number'],
-                $record['rfid_uid'] ?: '-',
-                $name,
-                $record['course'],
-                $record['year_level'],
-                $record['department'],
-            ];
+            $exportCategory = $filters['category'] ?? 'all';
+            $includeStrand = $exportCategory === 'all' || $exportCategory === 'Basic Education';
+            
+            if ($includeStrand) {
+                $rowData = [
+                    $record['student_number'],
+                    $record['rfid_uid'] ?: '-',
+                    $name,
+                    $record['program'] ?: '-',
+                    $record['year_level'] ?: '-',
+                    $record['department'] ?: '-',
+                    $record['strand'] ?: '-',
+                ];
+            } else {
+                $rowData = [
+                    $record['student_number'],
+                    $record['rfid_uid'] ?: '-',
+                    $name,
+                    $record['program'] ?: '-',
+                    $record['year_level'] ?: '-',
+                    $record['department'] ?: '-',
+                ];
+            }
         } elseif ($exportType === 'employees') {
             $name    = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
             $rowData = [

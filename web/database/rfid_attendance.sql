@@ -55,24 +55,22 @@ INSERT INTO `attendance_logs` (`id`, `student_id`, `employee_id`, `log_date`, `t
 -- Table structure for table `employees`
 --
 
-CREATE TABLE employees (
-  id INT(11) NOT NULL,
-  employee_number VARCHAR(50) NOT NULL,
-  last_name VARCHAR(100) NOT NULL,
-  first_name VARCHAR(100) NOT NULL,
-  middle_name VARCHAR(100) DEFAULT NULL,
-  suffix VARCHAR(10) DEFAULT NULL,
-  department VARCHAR(100) DEFAULT NULL,
-  position VARCHAR(100) DEFAULT NULL,
-  rfid_uid VARCHAR(255) NULL DEFAULT NULL,
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY employee_number (employee_number),
-  UNIQUE KEY rfid_uid (rfid_uid)
+CREATE TABLE `employees` (
+  `id` int(11) NOT NULL,
+  `employee_number` varchar(50) NOT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `suffix` varchar(10) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `position` varchar(100) DEFAULT NULL,
+  `rfid_uid` varchar(100) NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+ALTER TABLE `employees` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
 
 --
 -- Dumping data for table `employees`
@@ -111,8 +109,10 @@ CREATE TABLE `students` (
   `first_name` varchar(100) NOT NULL,
   `middle_name` varchar(100) DEFAULT NULL,
   `suffix` varchar(10) DEFAULT NULL,
-  `course` varchar(100) DEFAULT NULL,
+  `category` varchar(50) DEFAULT NULL,
+  `program` varchar(100) DEFAULT NULL,
   `year_level` varchar(50) DEFAULT NULL,
+  `strand` varchar(100) DEFAULT NULL,
   `department` varchar(100) DEFAULT NULL,
   `rfid_uid` varchar(100) NOT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
@@ -126,9 +126,9 @@ ALTER TABLE `students` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`id`, `student_number`, `last_name`, `first_name`, `middle_name`, `suffix`, `course`, `year_level`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, '2024-0001', 'Santos', 'Maria', 'Clara', NULL, 'BSIT', '2nd Year', 'CICS', 'A1B2C3D4', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03'),
-(2, '2024-0002', 'Reyes', 'Juan', 'Luna', NULL, 'BSCS', '1st Year', 'CICS', 'E5F6G7H8', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03');
+INSERT INTO `students` (`id`, `student_number`, `last_name`, `first_name`, `middle_name`, `suffix`, `category`, `program`, `year_level`, `strand`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
+(1, '2024-0001', 'Santos', 'Maria', 'Clara', NULL, 'Tertiary', 'BSIT', '2nd Year', NULL, 'CICS', 'A1B2C3D4', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03'),
+(2, '2024-0002', 'Reyes', 'Juan', 'Luna', NULL, 'Tertiary', 'BSCS', '1st Year', NULL, 'CICS', 'E5F6G7H8', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03');
 
 -- --------------------------------------------------------
 
@@ -136,38 +136,27 @@ INSERT INTO `students` (`id`, `student_number`, `last_name`, `first_name`, `midd
 -- Table structure for table `users`
 --
 
-CREATE TABLE users (
-  id INT(11) NOT NULL,
-  employee_id INT(11) NULL,
-  username VARCHAR(50) NOT NULL,
-  last_name VARCHAR(100) NOT NULL,
-  first_name VARCHAR(100) NOT NULL,
-  middle_name VARCHAR(100) DEFAULT NULL,
-  suffix VARCHAR(10) DEFAULT NULL,
-  email VARCHAR(150) NOT NULL,
-  password_hash VARCHAR(255) NOT NULL,
-  role ENUM('Admin','Superadmin') NOT NULL DEFAULT 'Admin',
-  is_active TINYINT(1) NOT NULL DEFAULT 1,
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (id),
-  UNIQUE KEY username (username),
-  UNIQUE KEY email (email),
-  KEY employee_id (employee_id),
-  CONSTRAINT fk_users_employee
-    FOREIGN KEY (employee_id)
-    REFERENCES employees(id)
-    ON DELETE SET NULL
-    ON UPDATE CASCADE
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `username` varchar(50) NOT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `suffix` varchar(10) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `role` enum('Admin','Superadmin') NOT NULL DEFAULT 'Admin',
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+ALTER TABLE users ADD COLUMN employee_id INT NULL AFTER id;
+ALTER TABLE users ADD CONSTRAINT fk_users_employee FOREIGN KEY (employee_id) REFERENCES employees(id);
 
 --
 -- Dumping data for table `users`
 --
-
-INSERT INTO `users` (`id`, `username`, `last_name`, `first_name`, `middle_name`, `suffix`, `email`, `password_hash`, `role`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'supadmin', 'Doe', 'Jane', 'Smith', NULL, 'supadmin@gmail.com', 'hash_pw_123', 'Superadmin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04'),
-(2, 'admin', 'Brown', 'Robert', NULL, NULL, 'admin@gmail.com', 'hash_pw_456', 'Admin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04');
 
 --
 -- Indexes for dumped tables
