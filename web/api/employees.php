@@ -11,7 +11,7 @@ require_once __DIR__ . '/csrf.php';
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
-if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PATCH', 'PUT', 'DELETE'])) {
+if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PATCH', 'PUT', 'DELETE'], true)) {
     validate_csrf_token();
 }
 
@@ -95,6 +95,13 @@ function find_rfid_uid_owner(mysqli $con, string $rfidUid, ?string $excludeType 
 
 function handle_get(mysqli $con): void
 {
+    $action = $_GET['action'] ?? '';
+
+    if ($action === 'validate-rfid') {
+        handle_validate_rfid_uid($con);
+        return;
+    }
+
     $sql = "
         SELECT
             id,
@@ -137,7 +144,41 @@ function handle_get(mysqli $con): void
         }, $employees),
     ]);
 }
+// ── Validate RFID UID ──────────────────────────────────────────────────────────
 
+function handle_validate_rfid_uid(mysqli $con): void
+{
+    $rfidUid = trim($_GET['rfid_uid'] ?? '');
+    $excludeId = isset($_GET['exclude_id']) ? (int) $_GET['exclude_id'] : 0;
+
+    if ($rfidUid === '') {
+        json_response([
+            'success' => false,
+            'message' => 'RFID UID is required.',
+        ], 422);
+    }
+
+    $rfidOwner = find_rfid_uid_owner($con, $rfidUid, 'employee', $excludeId);
+
+    if ($rfidOwner !== null) {
+        json_response([
+            'success' => false,
+            'message' => sprintf(
+                'RFID UID already exists (assigned to %s: %s)',
+                $rfidOwner['type'],
+                $rfidOwner['name'],
+            ),
+            'exists' => true,
+            'owner' => $rfidOwner,
+        ]);
+    }
+
+    json_response([
+        'success' => true,
+        'message' => 'RFID UID is available.',
+        'exists' => false,
+    ]);
+}
 // ── POST /api/employees.php ───────────────────────────────────────────────────
 
 function handle_post(mysqli $con): void

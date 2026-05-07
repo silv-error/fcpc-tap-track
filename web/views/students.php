@@ -351,7 +351,10 @@ require_once __DIR__ . '/../api/csrf.php';
       </div>
       <div class="overview-field overview-field-full">
         <label for="editStudentRfid" class="edit-label-active">RFID UID:</label>
-        <input id="editStudentRfid" type="text" class="edit-input-active" />
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input id="editStudentRfid" type="text" class="edit-input-active" placeholder="Tap RFID card or use clear button..." style="flex: 1;" />
+          <button type="button" class="toolbar-btn toolbar-btn-secondary" id="clearEditStudentRfid" onclick="clearEditStudentRfid()" title="Clear RFID UID">Clear</button>
+        </div>
       </div>
     </div>
     <div class="overview-divider"></div>
@@ -498,13 +501,17 @@ require_once __DIR__ . '/../api/csrf.php';
       <!-- RFID UID (always visible at end) -->
       <div class="overview-field overview-field-full">
         <label for="addStudentRfid">RFID UID:</label>
-        <input
-          id="addStudentRfid"
-          type="text"
-          class="edit-input-active"
-          placeholder="RFID UID"
-          readonly
-        />
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input
+            id="addStudentRfid"
+            type="text"
+            class="edit-input-active"
+            placeholder="Tap RFID card to scan..."
+            readonly
+            style="flex: 1;"
+          />
+          <button type="button" class="toolbar-btn toolbar-btn-secondary" onclick="clearAddRfid('addStudentRfid')" title="Clear RFID UID">Clear</button>
+        </div>
       </div>
     </div>
     <div class="overview-divider"></div>
@@ -520,116 +527,5 @@ require_once __DIR__ . '/../api/csrf.php';
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/script.js?v=<?= time(); ?>"></script>
-
-<script>
-let rfidPollingTimer = null;
-let latestRfidBufferId = 0;
-
-function getAddStudentRfidInput() {
-  return document.getElementById("addStudentRfid");
-}
-
-function startRfidAutoFetch() {
-  const rfidInput = getAddStudentRfidInput();
-
-  if (!rfidInput) {
-    console.error("RFID UID input field was not found.");
-    return;
-  }
-
-  console.log("RFID auto-fetch started.");
-
-  rfidInput.value = "";
-  rfidInput.placeholder = "Tap RFID card now...";
-  rfidInput.readOnly = true;
-
-  stopRfidAutoFetch();
-
-  rfidPollingTimer = setInterval(fetchLatestRfidUid, 5000);
-  fetchLatestRfidUid();
-}
-
-function stopRfidAutoFetch() {
-  if (rfidPollingTimer !== null) {
-    clearInterval(rfidPollingTimer);
-    rfidPollingTimer = null;
-    console.log("RFID auto-fetch stopped.");
-  }
-}
-
-function fetchLatestRfidUid() {
-  const rfidInput = getAddStudentRfidInput();
-
-  if (!rfidInput) {
-    return;
-  }
-
-  fetch("../api/students.php?action=latest-rfid&last_id=" + latestRfidBufferId + "&t=" + Date.now(), {
-    method: "GET",
-    headers: {
-      "Accept": "application/json"
-    },
-    cache: "no-store"
-  })
-    .then(function (response) {
-      if (!response.ok) {
-        throw new Error("HTTP error: " + response.status);
-      }
-
-      return response.json();
-    })
-    .then(function (data) {
-      console.log("RFID API response:", data);
-
-      if (data.success && data.rfid_uid) {
-        latestRfidBufferId = Number(data.id) || latestRfidBufferId;
-
-        rfidInput.value = data.rfid_uid;
-        rfidInput.placeholder = "RFID UID captured";
-
-        console.log("RFID UID inserted into Add Student field:", data.rfid_uid);
-      }
-    })
-    .catch(function (error) {
-      console.error("RFID fetch error:", error);
-    });
-}
-
-document.addEventListener("DOMContentLoaded", function () {
-  const addStudentBtn = document.getElementById("addStudentBtn");
-  const addStudentModal = document.getElementById("addStudentModal");
-
-  if (addStudentBtn) {
-    addStudentBtn.addEventListener("click", function () {
-      setTimeout(startRfidAutoFetch, 300);
-    });
-  }
-
-  const modalObserver = new MutationObserver(function () {
-    if (!addStudentModal) {
-      return;
-    }
-
-    const isOpen = addStudentModal.classList.contains("show") ||
-      addStudentModal.classList.contains("active") ||
-      window.getComputedStyle(addStudentModal).display !== "none";
-
-    if (isOpen) {
-      startRfidAutoFetch();
-    } else {
-      stopRfidAutoFetch();
-    }
-  });
-
-  if (addStudentModal) {
-    modalObserver.observe(addStudentModal, {
-      attributes: true,
-      attributeFilter: ["class", "style"]
-    });
-  }
-
-  console.log("RFID auto-fetch script ready.");
-});
-</script>
 </body>
 </html>

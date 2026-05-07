@@ -731,7 +731,7 @@ function populatePositionSelect(rows) {
 
 function applyFilters(resetPage = true) {
   const search     = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
-  const type       = document.getElementById('typeSelect')?.value || 'all';
+  const type       = (document.getElementById('typeSelect')?.value || 'all').toLowerCase();
   const date       = normalizeDate(document.getElementById('dateInput')?.value || '');
   const dept       = (document.getElementById('departmentSelect')?.value || 'all').toLowerCase();
   const category   = (document.getElementById('categorySelect')?.value || 'all').toLowerCase();
@@ -2081,11 +2081,42 @@ function openEditStudentModal(record) {
   setValue('editStudentDepartment', record.department);
   setValue('editStudentRfid',       record.rfid_uid !== '-' ? record.rfid_uid : '');
 
+  // Set RFID field to read-only (only RFID scanning can populate)
+  const rfidInput = document.getElementById('editStudentRfid');
+  if (rfidInput) rfidInput.readOnly = true;
+
   modal._record = record;
+  window._editStudentId = record.id;
   modal.classList.add('show');
 }
 
-function closeEditStudentModal() { document.getElementById('editStudentModal')?.classList.remove('show'); }
+function closeEditStudentModal() {
+  document.getElementById('editStudentModal')?.classList.remove('show');
+  window._editStudentId = 0;
+}
+
+function clearEditStudentRfid() {
+  const rfidInput = document.getElementById('editStudentRfid');
+  const modal = document.getElementById('editStudentModal');
+  
+  if (rfidInput) {
+    rfidInput.value = '';
+    rfidInput.placeholder = 'Tap RFID card or use clear button...';
+    rfidInput.readOnly = true;
+  }
+  
+  // Also clear from the modal record to prevent it from being restored
+  if (modal && modal._record) {
+    modal._record.rfid_uid = '';
+  }
+  
+  showToast('RFID UID cleared. Ready to scan.', 'info');
+  
+  // Re-enable auto-fetch after clearing
+  if (window.startRfidAutoFetch) {
+    setTimeout(() => window.startRfidAutoFetch(), 300);
+  }
+}
 
 async function saveEditStudent() {
   const modal  = document.getElementById('editStudentModal');
@@ -2235,11 +2266,42 @@ function openEditEmployeeModal(record) {
   setValue('editEmployeePosition',   record.position);
   setValue('editEmployeeRfid',       record.rfid_uid !== '-' ? record.rfid_uid : '');
 
+  // Set RFID field to read-only (only RFID scanning can populate)
+  const rfidInput = document.getElementById('editEmployeeRfid');
+  if (rfidInput) rfidInput.readOnly = true;
+
   modal._record = record;
+  window._editEmployeeId = record.id;
   modal.classList.add('show');
 }
 
-function closeEditEmployeeModal() { document.getElementById('editEmployeeModal')?.classList.remove('show'); }
+function closeEditEmployeeModal() {
+  document.getElementById('editEmployeeModal')?.classList.remove('show');
+  window._editEmployeeId = 0;
+}
+
+function clearEditEmployeeRfid() {
+  const rfidInput = document.getElementById('editEmployeeRfid');
+  const modal = document.getElementById('editEmployeeModal');
+  
+  if (rfidInput) {
+    rfidInput.value = '';
+    rfidInput.placeholder = 'Tap RFID card or use clear button...';
+    rfidInput.readOnly = true;
+  }
+  
+  // Also clear from the modal record to prevent it from being restored
+  if (modal && modal._record) {
+    modal._record.rfid_uid = '';
+  }
+  
+  showToast('RFID UID cleared. Ready to scan.', 'info');
+  
+  // Re-enable auto-fetch after clearing
+  if (window.startRfidAutoFetch) {
+    setTimeout(() => window.startRfidAutoFetch(), 300);
+  }
+}
 
 async function saveEditEmployee() {
   const modal  = document.getElementById('editEmployeeModal');
@@ -2402,38 +2464,90 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 window.addEventListener('beforeunload', stopRealtimeTableRefresh);
 
-// ── Live RFID UID Auto-Fetch ──────────────────────────────────────────────────
+// ── Live RFID UID Auto-Fetch with Edit Modal Support ────────────────────────
 
 (function () {
   console.log('Live RFID auto-fetch script loaded.');
 
   let rfidPollingTimer    = null;
   let latestRfidBufferId  = 0;
+  let currentRfidContext  = null;
+  let lastValidatedRfid   = null;
 
   const RFID_API_URL = '/fcpc-tap-track/web/api/students.php?action=latest-rfid';
 
-  function getRfidUidInput() {
-    return (
-      document.querySelector('input[name="rfid_uid"]') ||
-      document.getElementById('rfid_uid') ||
-      document.querySelector('input[placeholder="RFID UID"]') ||
-      document.querySelector('input[placeholder*="RFID"]')
-    );
+  function getContextFromModal() {
+    if (document.getElementById('addStudentModal')?.classList.contains('show')) return { type: 'addStudent', recordId: 0 };
+    if (document.getElementById('editStudentModal')?.classList.contains('show')) return { type: 'editStudent', recordId: window._editStudentId || 0 };
+    if (document.getElementById('addEmployeeModal')?.classList.contains('show')) return { type: 'addEmployee', recordId: 0 };
+    if (document.getElementById('editEmployeeModal')?.classList.contains('show')) return { type: 'editEmployee', recordId: window._editEmployeeId || 0 };
+    return null;
   }
 
-  function isAddStudentModalOpen() {
-    const rfidInput = getRfidUidInput();
-    if (!rfidInput) return false;
-    const modal = rfidInput.closest('.modal') || rfidInput.closest('[role="dialog"]') || rfidInput.closest('form') || rfidInput.closest('div');
-    if (!modal) return false;
-    const style = window.getComputedStyle(modal);
-    return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+  function getRfidUidInput() {
+    const context = getContextFromModal();
+    if (!context) return null;
+
+    const inputIds = {
+      'addStudent': 'addStudentRfid',
+      'editStudent': 'editStudentRfid',
+      'addEmployee': 'addEmployeeRfid',
+      'editEmployee': 'editEmployeeRfid',
+    };
+
+    return document.getElementById(inputIds[context.type] || '');
+  }
+
+  async function validateRfidUid(rfidUid, moduleType, recordId = 0) {
+    if (!rfidUid || rfidUid.trim() === '') return;
+    if (lastValidatedRfid === rfidUid) return;
+    lastValidatedRfid = rfidUid;
+
+    const endpoint = moduleType.includes('student') ? 'students.php' : 'employees.php';
+    const apiUrl = `../../api/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
+
+    try {
+      const response = await fetch(apiUrl, { headers: { Accept: 'application/json' } });
+      const data = await response.json();
+
+      if (!data.success && data.exists) {
+        showToast(`RFID UID already exists: ${data.owner?.name || 'Unknown'}`, 'error');
+        const rfidInput = getRfidUidInput();
+        if (rfidInput) {
+          rfidInput.value = '';
+          rfidInput.placeholder = 'RFID UID already in use';
+          setTimeout(() => {
+            if (rfidInput.value === '') {
+              rfidInput.placeholder = 'Tap RFID card now...';
+            }
+          }, 2000);
+        }
+        lastValidatedRfid = null;
+      } else if (data.success) {
+        showToast('RFID UID is valid', 'success');
+      }
+    } catch (error) {
+      console.error('RFID validation error:', error);
+    }
   }
 
   function startRfidAutoFetch() {
     const rfidInput = getRfidUidInput();
-    if (!rfidInput) { console.error('RFID UID input field was not found.'); return; }
-    console.log('RFID auto-fetch started.');
+    if (!rfidInput) {
+      console.error('RFID UID input field was not found.');
+      return;
+    }
+
+    const context = getContextFromModal();
+    if (!context) {
+      console.warn('No modal detected');
+      return;
+    }
+
+    console.log(`RFID auto-fetch started for: ${context.type}`);
+    currentRfidContext = context;
+    lastValidatedRfid = null;
+
     rfidInput.readOnly    = true;
     rfidInput.placeholder = 'Tap RFID card now...';
     stopRfidAutoFetch();
@@ -2442,12 +2556,19 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
   }
 
   function stopRfidAutoFetch() {
-    if (rfidPollingTimer !== null) { clearInterval(rfidPollingTimer); rfidPollingTimer = null; console.log('RFID auto-fetch stopped.'); }
+    if (rfidPollingTimer !== null) {
+      clearInterval(rfidPollingTimer);
+      rfidPollingTimer = null;
+      console.log('RFID auto-fetch stopped.');
+    }
   }
 
   function fetchLatestRfidUid() {
     const rfidInput = getRfidUidInput();
-    if (!rfidInput) { console.error('RFID UID input field was not found while polling.'); return; }
+    if (!rfidInput) {
+      console.error('RFID UID input field was not found while polling.');
+      return;
+    }
 
     const url = `${RFID_API_URL}&last_id=${latestRfidBufferId}&t=${Date.now()}`;
     fetch(url, { method: 'GET', headers: { Accept: 'application/json' }, cache: 'no-store' })
@@ -2459,36 +2580,85 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
           rfidInput.value       = data.rfid_uid;
           rfidInput.placeholder = 'RFID UID captured';
           console.log('RFID UID inserted into input:', data.rfid_uid);
+
+          const context = getContextFromModal();
+          if (context) {
+            validateRfidUid(data.rfid_uid, context.type, context.recordId);
+          }
         }
       })
       .catch((error) => console.error('RFID fetch error:', error));
   }
 
-  function detectAddStudentModal() {
-    const rfidInput = getRfidUidInput();
-    if (rfidInput && rfidPollingTimer === null) startRfidAutoFetch();
-  }
-
   document.addEventListener('DOMContentLoaded', function () {
     console.log('RFID DOM listener ready.');
 
+    // Click event listeners for modal buttons
     document.addEventListener('click', function (e) {
       const target      = e.target;
       const clickedText = target.textContent ? target.textContent.trim() : '';
 
-      if (clickedText.includes('Add Student') || target.closest('[data-open-add-student]') || target.closest('#openAddStudentModal')) {
+      if (clickedText.includes('Add Student') || target.closest('#addStudentBtn')) {
+        setTimeout(startRfidAutoFetch, 300);
+      }
+      if (clickedText.includes('Add Employee') || target.closest('#addEmployeeBtn')) {
         setTimeout(startRfidAutoFetch, 300);
       }
 
-      if (clickedText.includes('Cancel') || clickedText.includes('Close') || target.closest('[data-close-add-student]') || target.closest('#closeAddStudentModal')) {
+      if (clickedText.includes('Cancel') || clickedText.includes('Close') || target.closest('.modal-overlay')) {
         stopRfidAutoFetch();
+        currentRfidContext = null;
       }
     });
 
-    setInterval(function () { if (isAddStudentModalOpen()) detectAddStudentModal(); }, 1000);
+    // Monitor RFID input fields for clearing - re-enable scanning when field is emptied
+    const rfidFieldIds = ['addStudentRfid', 'editStudentRfid', 'addEmployeeRfid', 'editEmployeeRfid'];
+    rfidFieldIds.forEach(fieldId => {
+      const field = document.getElementById(fieldId);
+      if (field) {
+        // For Edit modals, keep the field read-only at all times
+        const isEditModal = fieldId.includes('edit');
+        if (isEditModal) {
+          field.readOnly = true;
+        }
+
+        field.addEventListener('input', function () {
+          // Ensure Edit modal RFID fields stay read-only
+          if (isEditModal && !this.readOnly) {
+            this.readOnly = true;
+          }
+
+          if (this.value.trim() === '' && rfidPollingTimer === null) {
+            const context = getContextFromModal();
+            if (context && (
+              (context.type === 'addStudent' && fieldId === 'addStudentRfid') ||
+              (context.type === 'editStudent' && fieldId === 'editStudentRfid') ||
+              (context.type === 'addEmployee' && fieldId === 'addEmployeeRfid') ||
+              (context.type === 'editEmployee' && fieldId === 'editEmployeeRfid')
+            )) {
+              console.log(`${fieldId} cleared, re-enabling RFID auto-fetch`);
+              startRfidAutoFetch();
+            }
+          }
+        });
+      }
+    });
+
+    // Continuous modal state monitoring
+    setInterval(function () {
+      const context = getContextFromModal();
+      if (context && rfidPollingTimer === null) {
+        console.log(`Modal detected: ${context.type}, starting RFID auto-fetch`);
+        startRfidAutoFetch();
+      } else if (!context && rfidPollingTimer !== null) {
+        console.log('Modal closed, stopping RFID auto-fetch');
+        stopRfidAutoFetch();
+      }
+    }, 1000);
   });
 
   window.startRfidAutoFetch  = startRfidAutoFetch;
   window.stopRfidAutoFetch   = stopRfidAutoFetch;
   window.fetchLatestRfidUid  = fetchLatestRfidUid;
-})();
+  window.validateRfidUid     = validateRfidUid;
+})(); 
