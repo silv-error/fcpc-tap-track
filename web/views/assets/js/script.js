@@ -2506,10 +2506,16 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
     lastValidatedRfid = rfidUid;
 
     const endpoint = moduleType.includes('student') ? 'students.php' : 'employees.php';
-    const apiUrl = `../../api/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
+    const apiUrl = `../api/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
 
     try {
       const response = await fetch(apiUrl, { headers: { Accept: 'application/json' } });
+      
+      if (!response.ok) {
+        console.error('API response status:', response.status);
+        return;
+      }
+      
       const data = await response.json();
 
       if (!data.success && data.exists) {
