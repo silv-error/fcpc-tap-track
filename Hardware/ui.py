@@ -13,7 +13,7 @@ import threading
 import tkinter as tk
 from tkinter import font as tkfont
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Set
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -60,6 +60,27 @@ LEVEL_META = {
     "INFO":    (C_BLUE,   "INF"),
     "SYSTEM":  (C_SLATE,  "SYS"),
 }
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Column layout — single source of truth used by BOTH header and rows.
+#
+# Each entry: (header_text, pixel_width, left_pad)
+#   pixel_width  — exact px width of the containing Frame; a Label is placed
+#                  inside so it never stretches the column beyond this width.
+#                  0 means the column expands to fill remaining space.
+#   left_pad     — px gap to the left of this column.
+# ──────────────────────────────────────────────────────────────────────────────
+
+COLS = [
+    # name       px-w  lpad
+    ("#",         36,   10),   # 0  line number
+    ("TIME",      62,    8),   # 1  HH:MM:SS
+    ("LVL",       26,    8),   # 2  OK / ERR / …
+    ("TAG",       54,    8),   # 3  tag string
+    ("UID",       70,    8),   # 4  uid string
+    ("ACTION",    72,    8),   # 5  TIME_IN / TIME_OUT badge
+    ("MESSAGE",    0,   10),   # 6  fills remainder (width=0 → expand)
+]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -169,6 +190,130 @@ class _PulseDot(tk.Canvas):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Hardware reader watcher — runs in a daemon thread, pushes state changes
+# into AttendanceUI's queue via the same post_system() / post_log() calls.
+#
+# Strategy (in order of preference):
+#   1. pyscard  (pip install pyscard)  — PC/SC, works on Windows/macOS/Linux.
+#      Gives us real reader names and reliable connect/disconnect events.
+#   2. Fallback message telling the operator to install pyscard.
+#
+# The watcher is completely independent of the backend; it starts as soon as
+# AttendanceUI.__init__() completes so hotplug feedback works even in demo
+# mode with no backend attached.
+# ──────────────────────────────────────────────────────────────────────────────
+
+class _ReaderWatcher:
+    """
+    Polls PC/SC for reader changes every POLL_MS milliseconds.
+    Fires callbacks on the UI queue when readers appear or disappear.
+    Thread-safe: all public methods may be called from any thread.
+    """
+
+    POLL_MS   = 800   # how often to poll (milliseconds → seconds internally)
+    _STOP_EV  = threading.Event
+
+    def __init__(self, on_connected, on_disconnected, on_no_pcsc, on_log):
+        """
+        on_connected(name)   — called when a new reader is detected.
+        on_disconnected(name)— called when a previously seen reader vanishes.
+        on_no_pcsc()         — called once if pyscard is not installed.
+        on_log(level, tag, text) — generic log forwarder.
+        """
+        self._on_connected    = on_connected
+        self._on_disconnected = on_disconnected
+        self._on_no_pcsc      = on_no_pcsc
+        self._on_log          = on_log
+        self._stop            = threading.Event()
+        self._known: Set[str] = set()   # readers seen in last successful poll
+
+    def start(self):
+        t = threading.Thread(target=self._run, daemon=True, name="ReaderWatcher")
+        t.start()
+
+    def stop(self):
+        self._stop.set()
+
+    # ── internal ──────────────────────────────────────────────────────────────
+
+    def _run(self):
+        # Try to import pyscard
+        try:
+            from smartcard.System import readers as sc_readers
+            from smartcard.Exceptions import CardConnectionException
+        except ImportError:
+            self._on_no_pcsc()
+            return
+
+        # PC/SC available — enter poll loop
+        pcsc_error_logged = False
+
+        while not self._stop.is_set():
+            try:
+                current: Set[str] = {str(r) for r in sc_readers()}
+                pcsc_error_logged = False   # reset on success
+
+                appeared  = current - self._known
+                vanished  = self._known - current
+
+                for name in sorted(appeared):
+                    self._known.add(name)
+                    self._on_connected(name)
+
+                for name in sorted(vanished):
+                    self._known.discard(name)
+                    self._on_disconnected(name)
+
+            except Exception as exc:
+                # PC/SC daemon not running, permission error, etc.
+                if not pcsc_error_logged:
+                    self._on_log("WARN", "PCSC",
+                                 f"PC/SC subsystem error: {exc}")
+                    pcsc_error_logged = True
+                # If we had readers tracked, consider them all gone
+                for name in sorted(self._known):
+                    self._on_disconnected(name)
+                self._known.clear()
+
+            self._stop.wait(self.POLL_MS / 1000)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Column cell helpers — shared by header and row renderers
+#
+# FIX: tk.Label's `width` option is in CHARACTER units, not pixels.
+# We wrap every fixed-width cell in a Frame sized in pixels (via pack with
+# a fixed width and pack_propagate=False), then place the Label inside it.
+# The last column (px_w == 0) still uses a plain Label with expand=True.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _cell(parent, text, col_idx, bg, fg, font, anchor="w", right_pad=0):
+    """
+    Pack a fixed-pixel-width cell for column col_idx.
+    Uses COLS[col_idx] for (px_width, left_pad).
+    The last column (width=0) expands to fill remaining space.
+    """
+    _, px_w, lpad = COLS[col_idx]
+    is_last = (px_w == 0)
+
+    if is_last:
+        # Expanding message column — plain Label, no wrapper needed
+        lbl = tk.Label(parent, text=text, font=font, bg=bg, fg=fg, anchor=anchor)
+        lbl.pack(side="left", padx=(lpad, right_pad), fill="x", expand=True)
+        return lbl
+    else:
+        # Fixed-width column — Frame enforces pixel width; fill="y" so it
+        # inherits the row's height and the label inside remains visible.
+        frame = tk.Frame(parent, bg=bg, width=px_w)
+        frame.pack_propagate(False)          # prevent Label from resizing frame
+        frame.pack(side="left", padx=(lpad, 0), fill="y")
+
+        lbl = tk.Label(frame, text=text, font=font, bg=bg, fg=fg, anchor=anchor)
+        lbl.pack(fill="both", expand=True)
+        return lbl
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Main UI class
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -204,6 +349,16 @@ class AttendanceUI:
         self._build_fonts()
         self._build_ui()
         self._pump()
+
+        # Start hardware watcher — fires callbacks that enqueue UI updates.
+        # Runs independently of any backend; hotplug works in standalone demo.
+        self._watcher = _ReaderWatcher(
+            on_connected    = self._on_reader_connected,
+            on_disconnected = self._on_reader_disconnected,
+            on_no_pcsc      = self._on_no_pcsc,
+            on_log          = self.post_log,
+        )
+        self._watcher.start()
 
     # ──────────────────────────────────────────
     # Fonts
@@ -248,13 +403,10 @@ class AttendanceUI:
         left = tk.Frame(bar, bg=C_SURFACE)
         left.pack(side="left", padx=(18, 0), pady=10)
 
-        # small decorative mark
         tk.Label(left, text="▪", font=self.fnt_label,
                  bg=C_SURFACE, fg=C_TEAL).pack(side="left", padx=(0, 6))
-
         tk.Label(left, text="RFID ATTENDANCE", font=self.fnt_title,
                  bg=C_SURFACE, fg=C_TEXT_1).pack(side="left")
-
         tk.Label(left, text="  DEBUG MONITOR", font=self.fnt_title,
                  bg=C_SURFACE, fg=C_TEXT_2).pack(side="left")
 
@@ -276,7 +428,6 @@ class AttendanceUI:
         inner = tk.Frame(bar, bg=C_SURFACE)
         inner.pack(side="left", fill="y", padx=18)
 
-        # reader state section
         self._reader_dot = _PulseDot(inner)
         self._reader_dot.pack(side="left", pady=10, padx=(0, 7))
 
@@ -284,13 +435,11 @@ class AttendanceUI:
         tk.Label(inner, textvariable=self._reader_var,
                  font=self.fnt_dim, bg=C_SURFACE, fg=C_TEXT_2).pack(side="left")
 
-        # vertical divider
         _VLine(bar, color=C_BORDER)
 
         mid = tk.Frame(bar, bg=C_SURFACE)
         mid.pack(side="left", fill="y", padx=18)
 
-        # last scan result
         self._scan_dot = tk.Label(mid, text="●", font=self.fnt_label,
                                   bg=C_SURFACE, fg=C_TEXT_3, padx=0)
         self._scan_dot.pack(side="left", padx=(0, 6), pady=10)
@@ -302,7 +451,6 @@ class AttendanceUI:
         tk.Label(mid, textvariable=self._scan_var,
                  font=self.fnt_dim, bg=C_SURFACE, fg=C_TEXT_2).pack(side="left")
 
-        # right side: entry count
         right = tk.Frame(bar, bg=C_SURFACE)
         right.pack(side="right", padx=18)
 
@@ -315,28 +463,23 @@ class AttendanceUI:
     # ── Log column header ────────────────────────
 
     def _build_log_header(self):
+        """
+        Header row — uses the exact same COLS pixel widths and paddings
+        as each data row so the columns are guaranteed to align.
+        """
         bar = tk.Frame(self.root, bg=C_BG)
         bar.pack(fill="x")
 
-        cols = [
-            ("  #",    4,  C_TEXT_3, "e"),
-            ("TIME",   9,  C_TEXT_3, "w"),
-            ("LVL",    5,  C_TEXT_3, "w"),
-            ("TAG",    10, C_TEXT_3, "w"),
-            ("UID",    10, C_TEXT_3, "w"),
-            ("ACTION", 9,  C_TEXT_3, "w"),
-            ("MESSAGE", 0, C_TEXT_3, "w"),
-        ]
+        # col 0: # — right-aligned
+        _cell(bar, "#",       0, C_BG, C_TEXT_3, self.fnt_dim, anchor="e")
+        _cell(bar, "TIME",    1, C_BG, C_TEXT_3, self.fnt_dim)
+        _cell(bar, "LVL",     2, C_BG, C_TEXT_3, self.fnt_dim)
+        _cell(bar, "TAG",     3, C_BG, C_TEXT_3, self.fnt_dim)
+        _cell(bar, "UID",     4, C_BG, C_TEXT_3, self.fnt_dim)
+        _cell(bar, "ACTION",  5, C_BG, C_TEXT_3, self.fnt_dim)
+        _cell(bar, "MESSAGE", 6, C_BG, C_TEXT_3, self.fnt_dim, right_pad=12)
 
-        padx_left = 14
-        for i, (name, width, color, anchor) in enumerate(cols):
-            px = (padx_left, 0) if i == 0 else (8, 0)
-            kw = dict(font=self.fnt_dim, bg=C_BG, fg=color,
-                      anchor=anchor, pady=4)
-            if width:
-                kw["width"] = width
-            lbl = tk.Label(bar, text=name, **kw)
-            lbl.pack(side="left", padx=px)
+        bar.configure(pady=4)
 
     # ── Log area ────────────────────────────────
 
@@ -416,62 +559,49 @@ class AttendanceUI:
 
         color, abbrev = LEVEL_META.get(level, (C_SLATE, "???"))
 
-        # alternating row background
         row_bg = C_BG if self._row_idx % 2 == 0 else C_SURFACE
 
         row = tk.Frame(self._scroller.inner, bg=row_bg, pady=1)
         row.pack(fill="x")
 
-        def lbl(text, width=0, fg=C_TEXT_2, bold=False, anchor="w", padx=(8, 0)):
-            kw = dict(font=self.fnt_logb if bold else self.fnt_log,
-                      bg=row_bg, fg=fg, anchor=anchor, pady=0)
-            if width:
-                kw["width"] = width
-            tk.Label(row, text=text, **kw).pack(side="left", padx=padx)
+        # col 0 — line number, right-aligned
+        _cell(row, f"{self._row_idx + 1}", 0, row_bg, C_TEXT_3,
+              self.fnt_log, anchor="e")
 
-        # line number
-        lbl(f"{self._row_idx + 1:>5}", width=5, fg=C_TEXT_3,
-            anchor="e", padx=(10, 0))
+        # col 1 — timestamp
+        _cell(row, ts, 1, row_bg, C_TEXT_3, self.fnt_log)
 
-        # timestamp
-        lbl(ts, width=9, fg=C_TEXT_3)
+        # col 2 — level badge (coloured, bold)
+        _cell(row, abbrev, 2, row_bg, color, self.fnt_badge)
 
-        # level abbreviation with colour
-        tk.Label(row, text=abbrev, font=self.fnt_badge,
-                 bg=row_bg, fg=color, width=4, anchor="w"
-                 ).pack(side="left", padx=(8, 0))
+        # col 3 — tag
+        _cell(row, tag[:8] if tag else "", 3, row_bg, C_SLATE, self.fnt_log)
 
-        # tag
-        lbl(f"{tag[:10]:<10}" if tag else " " * 10, width=10, fg=C_SLATE)
+        # col 4 — uid
+        _cell(row, uid[:10] if uid else "", 4, row_bg, C_TEXT_3, self.fnt_log)
 
-        # uid
-        lbl(f"{uid[:10]:<10}" if uid else " " * 10, width=10, fg=C_TEXT_3)
-
-        # action badge
+        # col 5 — action pill inside a fixed-width Frame
+        _, px_w, lpad = COLS[5]
+        action_frame = tk.Frame(row, bg=row_bg, width=px_w)
+        action_frame.pack_propagate(False)
+        action_frame.pack(side="left", padx=(lpad, 0), fill="y")
         if action:
             a_color = C_GREEN if action == "TIME_IN" else C_TEAL
-            tk.Label(row, text=action, font=self.fnt_badge,
-                     bg=C_RAISED, fg=a_color,
-                     padx=5, pady=1).pack(side="left", padx=(8, 0))
-        else:
-            tk.Label(row, text=" " * 9, font=self.fnt_log,
-                     bg=row_bg).pack(side="left", padx=(8, 0))
+            pill = tk.Label(action_frame, text=action, font=self.fnt_badge,
+                            bg=C_RAISED, fg=a_color, padx=4, pady=1)
+            pill.place(relx=0.0, rely=0.5, anchor="w")
 
-        # message — fills remaining space
+        # col 6 — message, expands
         msg_fg = color if level in ("ERROR", "WARN") else C_TEXT_1
-        tk.Label(row, text=text, font=self.fnt_log,
-                 bg=row_bg, fg=msg_fg, anchor="w"
-                 ).pack(side="left", fill="x", expand=True, padx=(10, 12))
+        _cell(row, text, 6, row_bg, msg_fg, self.fnt_log, right_pad=12)
 
-        # thin bottom separator every row
-        tk.Frame(self._scroller.inner, bg=C_BORDER, height=1).pack(
-            fill="x", padx=0)
+        # thin row separator
+        tk.Frame(self._scroller.inner, bg=C_BORDER, height=1).pack(fill="x")
 
         self._rows.append(row)
         self._row_idx += 1
         self._count_var.set(str(self._row_idx))
 
-        # trim oldest
         if len(self._rows) > MAX_ROWS:
             self._rows.pop(0).destroy()
 
@@ -489,26 +619,64 @@ class AttendanceUI:
         self._scan_var.set(text[:80])
 
     def _update_reader_status(self, msg: dict):
-        state = msg.get("state", "detecting")   # "detecting" | "connected" | "disconnected"
+        state = msg.get("state", "detecting")
+        name  = msg.get("name", "")
 
         if state == "detecting":
             self._reader_var.set("READER  ·  detecting...")
             self._reader_dot.set_color(C_AMBER, pulse=True)
             self._reader_dot.start_pulse()
         elif state == "connected":
-            reader_name = msg.get("name", "")
-            label = f"READER  ·  {reader_name}" if reader_name else "READER  ·  connected"
+            label = f"READER  ·  {name}" if name else "READER  ·  connected"
             self._reader_var.set(label[:60])
             self._reader_dot.stop_pulse(C_GREEN)
         elif state == "disconnected":
-            self._reader_var.set("READER  ·  disconnected — detecting...")
+            # Show which reader left; revert to detecting
+            label = f"READER  ·  disconnected ({name})" if name else "READER  ·  disconnected"
+            self._reader_var.set((label + "  —  detecting...")[:60])
             self._reader_dot.set_color(C_AMBER, pulse=True)
             self._reader_dot.start_pulse()
 
+    # ──────────────────────────────────────────
+    # Hardware watcher callbacks (called from watcher thread → thread-safe
+    # because they only push to self._q, never touch Tk widgets directly)
+    # ──────────────────────────────────────────
+
+    def _on_reader_connected(self, name: str):
+        ts = datetime.now().strftime("%H:%M:%S")
+        self._q.put({"kind": "reader", "state": "connected", "name": name})
+        self._q.put({
+            "kind": "row",
+            "level": "SYSTEM",
+            "tag": "HOTPLUG",
+            "text": f"Reader connected: {name}",
+            "uid": "", "action": "", "timestamp": ts,
+        })
+
+    def _on_reader_disconnected(self, name: str):
+        ts = datetime.now().strftime("%H:%M:%S")
+        # Only switch to "detecting" state if no other readers remain known
+        self._q.put({"kind": "reader", "state": "disconnected", "name": name})
+        self._q.put({
+            "kind": "row",
+            "level": "WARN",
+            "tag": "HOTPLUG",
+            "text": f"Reader disconnected: {name}",
+            "uid": "", "action": "", "timestamp": ts,
+        })
+
+    def _on_no_pcsc(self):
+        ts = datetime.now().strftime("%H:%M:%S")
+        self._q.put({
+            "kind": "row",
+            "level": "WARN",
+            "tag": "PCSC",
+            "text": "pyscard not installed — install with: pip install pyscard",
+            "uid": "", "action": "", "timestamp": ts,
+        })
+        # Leave reader indicator in its initial "detecting" state
+
     def _clear(self):
-        for r in self._rows:
-            r.destroy()
-        # also clear the separator frames
         for w in list(self._scroller.inner.winfo_children()):
             w.destroy()
         self._rows.clear()
@@ -548,7 +716,6 @@ class AttendanceUI:
         """Post a system/reader message. Automatically updates reader indicator."""
         ts = datetime.now().strftime("%H:%M:%S")
 
-        # derive reader state from known message patterns
         tl = text.lower()
         if "detecting" in tl or "waiting" in tl:
             self._q.put({"kind": "reader", "state": "detecting"})
@@ -593,7 +760,12 @@ class AttendanceUI:
         """
         if backend_start_fn:
             threading.Thread(target=backend_start_fn, daemon=True).start()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self.root.mainloop()
+
+    def _on_close(self):
+        self._watcher.stop()
+        self.root.destroy()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -601,17 +773,19 @@ class AttendanceUI:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _demo():
+    """
+    Feeds simulated RFID scan events so the UI can be tested without
+    a live backend.  Reader connect/disconnect feedback now comes from
+    the _ReaderWatcher thread watching your actual PC/SC subsystem —
+    plug or unplug a reader while the demo is running to see it live.
+    """
     import time
 
     ui = AttendanceUI()
 
     def _feed():
-        time.sleep(0.5)
-        ui.post_system("Detecting RFID reader...")
-        time.sleep(1.8)
-        ui.post_system("RFID reader connected: ACS ACR122U 00 00")
-        ui.post_system("Ready. Tap NFC card.")
-        time.sleep(0.6)
+        # Give the watcher a moment to report the initial reader state
+        time.sleep(2.0)
 
         scans = [
             (True,  "A1B2C3D4", "TIME_IN",  "Time In recorded for Santos, Juan dela Cruz."),
@@ -634,11 +808,6 @@ def _demo():
         ui.post_log("INFO",  "DB",     "Connection pool: 2/10 active")
         time.sleep(0.4)
         ui.post_log("ERROR", "DB",     "Failed to save scan log. UID=CAFE1234, Error=timeout")
-        time.sleep(1.0)
-        ui.post_system("RFID reader disconnected — detecting...")
-        time.sleep(2.0)
-        ui.post_system("RFID reader connected: ACS ACR122U 00 00")
-        ui.post_system("Ready. Tap NFC card.")
 
     threading.Thread(target=_feed, daemon=True).start()
     ui.launch()
