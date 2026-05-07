@@ -1,10 +1,14 @@
+import json
 import queue
 import threading
 import traceback
 import tkinter as tk
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from tkinter import font as tkfont
 from datetime import datetime
 from typing import Optional, Set
+
+HTTP_LOG_LISTENER_PORT = 5678
 
 
 C_BG = "#0e1015"
@@ -19,6 +23,7 @@ C_GREEN = "#2ecc71"
 C_AMBER = "#e6a817"
 C_RED = "#e05252"
 C_SLATE = "#4e5a78"
+C_PURPLE = "#9b6dff"
 
 C_TEXT_1 = "#dde3f0"
 C_TEXT_2 = "#7b87a8"
@@ -34,6 +39,7 @@ SZ_BADGE = 8
 SZ_CLOCK = 9
 
 MAX_ROWS = 600
+MAX_HTTP_ROWS = 300
 
 LEVEL_META = {
     "SUCCESS": (C_GREEN, "OK "),
@@ -41,6 +47,14 @@ LEVEL_META = {
     "WARN": (C_AMBER, "WRN"),
     "INFO": (C_BLUE, "INF"),
     "SYSTEM": (C_SLATE, "SYS"),
+}
+
+HTTP_METHOD_COLORS = {
+    "GET": C_TEAL,
+    "POST": C_BLUE,
+    "PUT": C_AMBER,
+    "PATCH": C_PURPLE,
+    "DELETE": C_RED,
 }
 
 
@@ -183,11 +197,73 @@ class _ReaderWatcher:
             self._stop.wait(self.POLL_MS / 1000)
 
 
+class _HttpLogListener:
+    """Lightweight HTTP server that receives log payloads from PHP via cURL.
+
+    PHP POSTs JSON to  POST http://127.0.0.1:5678/http-log
+    with body: { method, endpoint, status, detail }
+
+    The listener forwards each entry to the UI queue via the ``on_request``
+    callback so it is rendered on the main thread by the normal _pump() loop.
+    """
+
+    def __init__(self, port: int, on_request):
+        self._port = port
+        self._on_request = on_request
+        self._server: Optional[HTTPServer] = None
+        self._thread: Optional[threading.Thread] = None
+
+    def start(self):
+        on_request = self._on_request
+        port = self._port
+
+        class _Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                if self.path != "/http-log":
+                    self.send_response(404)
+                    self.end_headers()
+                    return
+
+                try:
+                    length = int(self.headers.get("Content-Length", 0))
+                    raw = self.rfile.read(length)
+                    data = json.loads(raw)
+                    on_request(data)
+                except Exception:
+                    pass
+
+                self.send_response(204)
+                self.end_headers()
+
+            # Silence the default per-request stderr log lines
+            def log_message(self, *args):
+                pass
+
+        try:
+            self._server = HTTPServer(("127.0.0.1", port), _Handler)
+        except OSError:
+            # Port already in use — skip silently; PHP will just time out
+            return
+
+        self._thread = threading.Thread(
+            target=self._server.serve_forever,
+            daemon=True,
+            name="HttpLogListener",
+        )
+        self._thread.start()
+
+    def stop(self):
+        if self._server:
+            self._server.shutdown()
+
+
 class AttendanceUI:
     def __init__(self):
         self._q: queue.Queue = queue.Queue()
         self._row_idx = 0
         self._log_line_count = 0
+        self._http_row_idx = 0
+        self._http_line_count = 0
 
         self._backend_thread: Optional[threading.Thread] = None
         self._backend_start_fn = None
@@ -196,8 +272,8 @@ class AttendanceUI:
 
         self.root = tk.Tk()
         self.root.title("RFID Attendance — Debug Monitor")
-        self.root.geometry("1040x660")
-        self.root.minsize(780, 480)
+        self.root.geometry("1040x820")
+        self.root.minsize(780, 600)
         self.root.configure(bg=C_BG)
 
         try:
@@ -216,6 +292,25 @@ class AttendanceUI:
             on_log=self.post_log,
         )
         self._watcher.start()
+
+        self._http_listener = _HttpLogListener(
+            port=HTTP_LOG_LISTENER_PORT,
+            on_request=self._on_php_http_log,
+        )
+        self._http_listener.start()
+
+    def _on_php_http_log(self, data: dict):
+        """Called from the listener thread — must only touch the queue."""
+        self._q.put({
+            "kind":       "http_row",
+            "timestamp":  datetime.now().strftime("%H:%M:%S"),
+            "method":     data.get("method", "GET"),
+            "status":     int(data.get("status", 0)),
+            "latency_ms": data.get("latency_ms"),
+            "user":       data.get("user") or "-",
+            "endpoint":   data.get("endpoint", ""),
+            "detail":     data.get("detail", ""),
+        })
 
     def _build_fonts(self):
         def make_font(size, bold=False):
@@ -239,9 +334,10 @@ class AttendanceUI:
         _Sep(self.root, color=C_BORDER_HI)
         self._build_status_bar()
         _Sep(self.root, color=C_BORDER)
-        self._build_log_header()
-        _Sep(self.root, color=C_BORDER)
-        self._build_log_area()
+
+        # Main content area — RFID log on top, HTTP log on bottom
+        self._build_rfid_panel()
+        self._build_http_panel()
         self._build_footer()
 
     def _build_header(self):
@@ -365,7 +461,19 @@ class AttendanceUI:
             fg=C_TEXT_3,
         ).pack(side="right")
 
-    def _build_log_header(self):
+    # ------------------------------------------------------------------ #
+    #  RFID LOG PANEL                                                      #
+    # ------------------------------------------------------------------ #
+
+    def _build_rfid_panel(self):
+        self._rfid_panel = tk.Frame(self.root, bg=C_BG)
+        self._rfid_panel.pack(fill="both", expand=True)
+
+        self._build_rfid_log_header()
+        _Sep(self._rfid_panel, color=C_BORDER)
+        self._build_rfid_log_area()
+
+    def _build_rfid_log_header(self):
         header_text = (
             f"{'#':>4}  "
             f"{'TIME':<8}  "
@@ -376,11 +484,25 @@ class AttendanceUI:
             f"MESSAGE"
         )
 
-        bar = tk.Frame(self.root, bg=C_BG)
+        bar = tk.Frame(self._rfid_panel, bg=C_BG)
         bar.pack(fill="x")
 
+        left = tk.Frame(bar, bg=C_BG)
+        left.pack(side="left", fill="x", expand=True)
+
         tk.Label(
-            bar,
+            left,
+            text="▸  RFID  /  SYSTEM  LOG",
+            font=self.fnt_badge,
+            bg=C_BG,
+            fg=C_TEAL,
+            anchor="w",
+            padx=14,
+            pady=5,
+        ).pack(side="left")
+
+        tk.Label(
+            left,
             text=header_text,
             font=self.fnt_dim,
             bg=C_BG,
@@ -390,8 +512,27 @@ class AttendanceUI:
             pady=4,
         ).pack(fill="x")
 
-    def _build_log_area(self):
-        wrapper = tk.Frame(self.root, bg=C_BG)
+        right = tk.Frame(bar, bg=C_BG)
+        right.pack(side="right", padx=14)
+
+        tk.Button(
+            right,
+            text="CLEAR",
+            font=self.fnt_badge,
+            bg=C_RAISED,
+            fg=C_TEXT_3,
+            bd=0,
+            padx=10,
+            pady=1,
+            activebackground=C_BORDER,
+            activeforeground=C_AMBER,
+            cursor="hand2",
+            relief="flat",
+            command=self._clear_rfid,
+        ).pack(side="right", pady=4)
+
+    def _build_rfid_log_area(self):
+        wrapper = tk.Frame(self._rfid_panel, bg=C_BG)
         wrapper.pack(fill="both", expand=True)
 
         self._log_text = tk.Text(
@@ -442,6 +583,178 @@ class AttendanceUI:
         self._log_text.tag_configure("WARN", foreground=C_AMBER)
         self._log_text.tag_configure("INFO", foreground=C_BLUE)
         self._log_text.tag_configure("SYSTEM", foreground=C_SLATE)
+
+    # ------------------------------------------------------------------ #
+    #  HTTP REQUEST LOG PANEL                                              #
+    # ------------------------------------------------------------------ #
+
+    def _build_http_panel(self):
+        _Sep(self.root, color=C_BORDER_HI)
+
+        self._http_panel = tk.Frame(self.root, bg=C_BG)
+        self._http_panel.pack(fill="both", expand=True)
+
+        self._build_http_log_header()
+        _Sep(self._http_panel, color=C_BORDER)
+        self._build_http_log_area()
+
+    def _build_http_log_header(self):
+        http_header_text = (
+            f"{'#':>4}  "
+            f"{'TIME':<8}  "
+            f"{'METHOD':<6}  "
+            f"{'STATUS':<6}  "
+            f"{'LATENCY':<8}  "
+            f"{'USER':<22}  "
+            f"{'ENDPOINT':<32}  "
+            f"DETAIL"
+        )
+
+        bar = tk.Frame(self._http_panel, bg=C_BG)
+        bar.pack(fill="x")
+
+        left = tk.Frame(bar, bg=C_BG)
+        left.pack(side="left", fill="x", expand=True)
+
+        tk.Label(
+            left,
+            text="▸  HTTP  REQUEST  LOG",
+            font=self.fnt_badge,
+            bg=C_BG,
+            fg=C_PURPLE,
+            anchor="w",
+            padx=14,
+            pady=5,
+        ).pack(side="left")
+
+        self._http_status_dot = tk.Label(
+            left,
+            text="●",
+            font=self.fnt_badge,
+            bg=C_BG,
+            fg=C_TEXT_3,
+        )
+        self._http_status_dot.pack(side="left", padx=(8, 4))
+
+        self._http_status_var = tk.StringVar(value="idle")
+        tk.Label(
+            left,
+            textvariable=self._http_status_var,
+            font=self.fnt_dim,
+            bg=C_BG,
+            fg=C_TEXT_3,
+        ).pack(side="left")
+
+        tk.Label(
+            left,
+            text=http_header_text,
+            font=self.fnt_dim,
+            bg=C_BG,
+            fg=C_TEXT_3,
+            anchor="w",
+            padx=14,
+            pady=4,
+        ).pack(fill="x")
+
+        right = tk.Frame(bar, bg=C_BG)
+        right.pack(side="right", padx=14)
+
+        self._http_count_var = tk.StringVar(value="0")
+
+        tk.Label(
+            right,
+            textvariable=self._http_count_var,
+            font=self.fnt_logb,
+            bg=C_BG,
+            fg=C_TEXT_2,
+        ).pack(side="right")
+
+        tk.Label(
+            right,
+            text="reqs  ",
+            font=self.fnt_dim,
+            bg=C_BG,
+            fg=C_TEXT_3,
+        ).pack(side="right")
+
+        tk.Button(
+            right,
+            text="CLEAR",
+            font=self.fnt_badge,
+            bg=C_RAISED,
+            fg=C_TEXT_3,
+            bd=0,
+            padx=10,
+            pady=1,
+            activebackground=C_BORDER,
+            activeforeground=C_AMBER,
+            cursor="hand2",
+            relief="flat",
+            command=self._clear_http,
+        ).pack(side="right", padx=(0, 8), pady=4)
+
+    def _build_http_log_area(self):
+        wrapper = tk.Frame(self._http_panel, bg=C_BG)
+        wrapper.pack(fill="both", expand=True)
+
+        self._http_text = tk.Text(
+            wrapper,
+            bg=C_BG,
+            fg=C_TEXT_1,
+            insertbackground=C_TEXT_1,
+            font=self.fnt_log,
+            bd=0,
+            highlightthickness=0,
+            wrap="none",
+            state="disabled",
+            padx=14,
+            pady=6,
+        )
+
+        scrollbar_y = tk.Scrollbar(
+            wrapper,
+            orient="vertical",
+            command=self._http_text.yview,
+            bg=C_SURFACE,
+            troughcolor=C_BG,
+            activebackground=C_PURPLE,
+            width=10,
+        )
+
+        scrollbar_x = tk.Scrollbar(
+            wrapper,
+            orient="horizontal",
+            command=self._http_text.xview,
+            bg=C_SURFACE,
+            troughcolor=C_BG,
+            activebackground=C_PURPLE,
+            width=10,
+        )
+
+        self._http_text.configure(
+            yscrollcommand=scrollbar_y.set,
+            xscrollcommand=scrollbar_x.set,
+        )
+
+        self._http_text.pack(side="left", fill="both", expand=True)
+        scrollbar_y.pack(side="right", fill="y")
+        scrollbar_x.pack(side="bottom", fill="x")
+
+        # Status-code colour tags
+        self._http_text.tag_configure("2xx", foreground=C_GREEN)
+        self._http_text.tag_configure("3xx", foreground=C_TEAL)
+        self._http_text.tag_configure("4xx", foreground=C_AMBER)
+        self._http_text.tag_configure("5xx", foreground=C_RED)
+        self._http_text.tag_configure("ERR", foreground=C_RED)
+        self._http_text.tag_configure("PENDING", foreground=C_SLATE)
+
+        # HTTP method colour tags
+        for method, color in HTTP_METHOD_COLORS.items():
+            self._http_text.tag_configure(f"M_{method}", foreground=color)
+
+    # ------------------------------------------------------------------ #
+    #  FOOTER                                                              #
+    # ------------------------------------------------------------------ #
 
     def _build_footer(self):
         _Sep(self.root, color=C_BORDER)
@@ -504,7 +817,7 @@ class AttendanceUI:
 
         tk.Button(
             bar,
-            text="CLEAR LOG",
+            text="CLEAR ALL",
             font=self.fnt_badge,
             bg=C_RAISED,
             fg=C_AMBER,
@@ -515,8 +828,12 @@ class AttendanceUI:
             activeforeground=C_AMBER,
             cursor="hand2",
             relief="flat",
-            command=self._clear,
+            command=self._clear_all,
         ).pack(side="right", padx=14, pady=5)
+
+    # ------------------------------------------------------------------ #
+    #  CLOCK & PUMP                                                        #
+    # ------------------------------------------------------------------ #
 
     def _tick_clock(self):
         self._clock_var.set(datetime.now().strftime("%Y-%m-%d   %H:%M:%S"))
@@ -540,12 +857,18 @@ class AttendanceUI:
 
         if kind == "row":
             self._append(msg)
+        elif kind == "http_row":
+            self._append_http(msg)
         elif kind == "status":
             self._update_scan_status(msg)
         elif kind == "reader":
             self._update_reader_status(msg)
         elif kind == "backend_buttons":
             self._apply_backend_buttons(msg.get("running", False))
+
+    # ------------------------------------------------------------------ #
+    #  RFID LOG — APPEND                                                   #
+    # ------------------------------------------------------------------ #
 
     def _append(self, msg: dict):
         level = msg.get("level", "INFO")
@@ -583,6 +906,75 @@ class AttendanceUI:
 
         if self._autoscroll.get():
             self._log_text.see("end")
+
+    # ------------------------------------------------------------------ #
+    #  HTTP LOG — APPEND                                                   #
+    # ------------------------------------------------------------------ #
+
+    def _append_http(self, msg: dict):
+        ts = msg.get("timestamp", "")
+        method = msg.get("method", "GET").upper()
+        status = msg.get("status", 0)        # int HTTP status code, 0 = error
+        latency_ms = msg.get("latency_ms")   # int or None
+        user = msg.get("user") or "-"
+        endpoint = msg.get("endpoint", "")
+        detail = msg.get("detail", "")
+
+        self._http_row_idx += 1
+        self._http_line_count += 1
+
+        # Determine colour tag from status
+        if status == 0:
+            tag = "ERR"
+            status_str = "ERR"
+        elif 200 <= status < 300:
+            tag = "2xx"
+            status_str = str(status)
+        elif 300 <= status < 400:
+            tag = "3xx"
+            status_str = str(status)
+        elif 400 <= status < 500:
+            tag = "4xx"
+            status_str = str(status)
+        else:
+            tag = "5xx"
+            status_str = str(status)
+
+        latency_str = f"{latency_ms}ms" if latency_ms is not None else "—"
+
+        line = (
+            f"{self._http_row_idx:>4}  "
+            f"{ts:<8}  "
+            f"{method:<6}  "
+            f"{status_str:<6}  "
+            f"{latency_str:<8}  "
+            f"{user[:22]:<22}  "
+            f"{endpoint[:32]:<32}  "
+            f"{detail}\n"
+        )
+
+        self._http_text.configure(state="normal")
+        self._http_text.insert("end", line, tag)
+
+        if self._http_line_count > MAX_HTTP_ROWS:
+            self._http_text.delete("1.0", "2.0")
+            self._http_line_count -= 1
+
+        self._http_text.configure(state="disabled")
+
+        self._http_count_var.set(str(self._http_row_idx))
+
+        # Update the last-request status indicator
+        dot_color = C_GREEN if tag == "2xx" else (C_AMBER if tag in ("3xx", "4xx") else C_RED)
+        self._http_status_dot.configure(fg=dot_color)
+        self._http_status_var.set(f"{method} {status_str}  {user}  {endpoint[:32]}")
+
+        if self._autoscroll.get():
+            self._http_text.see("end")
+
+    # ------------------------------------------------------------------ #
+    #  STATUS UPDATES                                                      #
+    # ------------------------------------------------------------------ #
 
     def _update_scan_status(self, msg: dict):
         success = msg.get("success", True)
@@ -662,7 +1054,11 @@ class AttendanceUI:
             }
         )
 
-    def _clear(self):
+    # ------------------------------------------------------------------ #
+    #  CLEAR                                                               #
+    # ------------------------------------------------------------------ #
+
+    def _clear_rfid(self):
         self._log_text.configure(state="normal")
         self._log_text.delete("1.0", "end")
         self._log_text.configure(state="disabled")
@@ -670,6 +1066,29 @@ class AttendanceUI:
         self._row_idx = 0
         self._log_line_count = 0
         self._count_var.set("0")
+
+    def _clear_http(self):
+        self._http_text.configure(state="normal")
+        self._http_text.delete("1.0", "end")
+        self._http_text.configure(state="disabled")
+
+        self._http_row_idx = 0
+        self._http_line_count = 0
+        self._http_count_var.set("0")
+        self._http_status_dot.configure(fg=C_TEXT_3)
+        self._http_status_var.set("idle")
+
+    def _clear(self):
+        """Alias kept for backwards compatibility — clears RFID log only."""
+        self._clear_rfid()
+
+    def _clear_all(self):
+        self._clear_rfid()
+        self._clear_http()
+
+    # ------------------------------------------------------------------ #
+    #  BACKEND BUTTON STATE                                                #
+    # ------------------------------------------------------------------ #
 
     def _queue_backend_button_state(self, running: bool):
         self._q.put(
@@ -731,6 +1150,10 @@ class AttendanceUI:
         finally:
             self._apply_backend_buttons(False)
             self.post_system("Backend stop requested.")
+
+    # ------------------------------------------------------------------ #
+    #  PUBLIC API — RFID / SYSTEM LOGGING                                 #
+    # ------------------------------------------------------------------ #
 
     def post_event(
         self,
@@ -811,6 +1234,49 @@ class AttendanceUI:
             }
         )
 
+    # ------------------------------------------------------------------ #
+    #  PUBLIC API — HTTP REQUEST LOGGING                                   #
+    # ------------------------------------------------------------------ #
+
+    def post_http(
+        self,
+        method: str,
+        endpoint: str,
+        status: int = 0,
+        latency_ms: Optional[int] = None,
+        user: str = "-",
+        detail: str = "",
+    ):
+        """Log an HTTP request entry to the HTTP Request Log panel.
+
+        Parameters
+        ----------
+        method      : HTTP verb — "GET", "POST", "PUT", "PATCH", "DELETE", etc.
+        endpoint    : URL path, optionally including ?action= query param.
+        user        : Display name / ID of the authenticated user, or "-".
+        status      : HTTP response status code.  Pass 0 (default) for
+                      connection errors / timeouts where no code was received.
+        latency_ms  : Round-trip time in milliseconds, or None if unavailable.
+        detail      : Optional extra message — e.g. error description or
+                      a brief summary of the response body.
+        """
+        self._q.put(
+            {
+                "kind": "http_row",
+                "timestamp": datetime.now().strftime("%H:%M:%S"),
+                "method": method.upper(),
+                "status": status,
+                "latency_ms": latency_ms,
+                "user": user,
+                "endpoint": endpoint,
+                "detail": detail,
+            }
+        )
+
+    # ------------------------------------------------------------------ #
+    #  BACKEND THREAD RUNNER                                               #
+    # ------------------------------------------------------------------ #
+
     def _run_backend_safely(self, backend_start_fn):
         try:
             self.post_system("Backend thread starting...")
@@ -830,6 +1296,10 @@ class AttendanceUI:
         finally:
             self._queue_backend_button_state(False)
             self.post_system("Backend thread stopped.")
+
+    # ------------------------------------------------------------------ #
+    #  LAUNCH                                                              #
+    # ------------------------------------------------------------------ #
 
     def launch(self, backend_start_fn=None, backend_stop_fn=None, auto_start=False):
         self._backend_start_fn = backend_start_fn
@@ -869,6 +1339,11 @@ class AttendanceUI:
             pass
 
         try:
+            self._http_listener.stop()
+        except Exception:
+            pass
+
+        try:
             if self.root.winfo_exists():
                 self.root.quit()
                 self.root.destroy()
@@ -878,6 +1353,7 @@ class AttendanceUI:
 
 def _demo():
     import time
+    import random
 
     ui = AttendanceUI()
 
@@ -925,19 +1401,49 @@ def _demo():
             ),
         ]
 
+        http_samples = [
+            ("POST", "/api/attendance.php", 200, "action=time_in — 1 row inserted"),
+            ("POST", "/api/attendance.php", 200, "action=time_out — record updated"),
+            ("GET",  "/api/students.php",   200, "action=validate-rfid — found"),
+            ("GET",  "/api/students.php",   404, "action=validate-rfid — not found"),
+            ("POST", "/api/attendance.php", 500, "Internal Server Error"),
+            ("GET",  "/api/students.php",   200, "action=latest-rfid — OK"),
+            ("POST", "/api/employees.php",  200, "action=time_in — employee logged"),
+            ("GET",  "/api/students.php",     0, "Connection refused — server down?"),
+        ]
+
+        scan_idx = 0
+        http_idx = 0
+
         while demo_running["value"]:
-            for ok, uid, action, message in scans:
-                if not demo_running["value"]:
-                    break
+            ok, uid, action, message = scans[scan_idx % len(scans)]
+            scan_idx += 1
 
-                time.sleep(1.1)
+            time.sleep(1.1)
 
-                ui.post_event(
-                    success=ok,
-                    text=message,
-                    uid=uid,
-                    action=action,
+            if not demo_running["value"]:
+                break
+
+            ui.post_event(
+                success=ok,
+                text=message,
+                uid=uid,
+                action=action,
+            )
+
+            # fire 1–2 HTTP entries per RFID scan
+            for _ in range(random.randint(1, 2)):
+                http_method, endpoint, status, detail = http_samples[http_idx % len(http_samples)]
+                http_idx += 1
+                latency = random.randint(12, 280) if status != 0 else None
+                ui.post_http(
+                    method=http_method,
+                    endpoint=endpoint,
+                    status=status,
+                    latency_ms=latency,
+                    detail=detail,
                 )
+                time.sleep(0.15)
 
         ui.post_log("SYSTEM", "DEMO", "Demo backend stopped.")
 
