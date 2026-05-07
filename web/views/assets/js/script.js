@@ -2478,6 +2478,21 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
 
   const RFID_API_URL = '/fcpc-tap-track/web/api/students.php?action=latest-rfid';
 
+  (async function initRfidBufferId() {
+    try {
+      const res  = await fetch(`${RFID_API_URL.replace('action=latest-rfid', 'action=rfid-buffer-max-id')}&t=${Date.now()}`, {
+        headers: { Accept: 'application/json' }, cache: 'no-store',
+      });
+      const data = await res.json();
+      if (data.success) {
+        latestRfidBufferId = data.max_id;
+        console.log('RFID buffer initialized at ID:', latestRfidBufferId);
+      }
+    } catch (e) {
+      console.warn('Could not initialize RFID buffer ID:', e);
+    }
+  })();
+
   function getContextFromModal() {
     if (document.getElementById('addStudentModal')?.classList.contains('show')) return { type: 'addStudent', recordId: 0 };
     if (document.getElementById('editStudentModal')?.classList.contains('show')) return { type: 'editStudent', recordId: window._editStudentId || 0 };
@@ -2515,7 +2530,7 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
         console.error('API response status:', response.status);
         return;
       }
-      
+    
       const data = await response.json();
 
       if (!data.success && data.exists) {

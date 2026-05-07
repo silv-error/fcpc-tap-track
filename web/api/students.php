@@ -38,6 +38,13 @@ function handle_get(mysqli $con): void
         return;
     }
 
+    if ($action === 'rfid-buffer-max-id') {
+        $result = mysqli_query($con, "SELECT COALESCE(MAX(id), 0) AS max_id FROM rfid_uid_buffer");
+        $row    = mysqli_fetch_assoc($result);
+        json_response(['success' => true, 'max_id' => (int) $row['max_id']]);
+        return;
+    }
+
     $sql = "
         SELECT
             id,
