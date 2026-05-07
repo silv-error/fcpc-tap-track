@@ -12,6 +12,8 @@ except ImportError:
     NoCardException = Exception
     CardConnectionException = Exception
 
+RECONNECT_INTERVAL = 2.0   # seconds between detection retries
+
 
 class RFIDReaderService:
     def __init__(
@@ -30,22 +32,20 @@ class RFIDReaderService:
         self.last_tap_time = 0.0
         self.cooldown_seconds = TAP_COOLDOWN_SECONDS
 
+    # ──────────────────────────────────────────────────────────────
+    # Lifecycle
+    # ──────────────────────────────────────────────────────────────
+
     def start(self):
         if self.running:
-            self.send_status("RFID reader is already running.")
             return
 
         self.running = True
-
-        self.thread = threading.Thread(
-            target=self.reader_loop,
-            daemon=True,
-        )
+        self.thread = threading.Thread(target=self.reader_loop, daemon=True)
         self.thread.start()
 
     def stop(self):
         if not self.running:
-            self.send_status("RFID reader is already stopped.")
             return
 
         self.running = False
@@ -55,6 +55,10 @@ class RFIDReaderService:
             self.thread.join(timeout=2)
 
         self.send_status("RFID reader stopped.")
+
+    # ──────────────────────────────────────────────────────────────
+    # Callbacks
+    # ──────────────────────────────────────────────────────────────
 
     def send_status(self, message: str):
         if self.on_status_callback:
@@ -66,20 +70,22 @@ class RFIDReaderService:
         if self.on_uid_callback:
             self.on_uid_callback(uid)
 
+    # ──────────────────────────────────────────────────────────────
+    # Hardware helpers
+    # ──────────────────────────────────────────────────────────────
+
     def get_reader(self):
         if readers is None:
             raise RuntimeError(
                 "pyscard is not installed. Run: python -m pip install pyscard"
             )
 
-        detected_readers = readers()
+        detected = readers()
 
-        if not detected_readers:
-            raise RuntimeError(
-                "No ACR122 NFC reader detected. Please plug in the reader."
-            )
+        if not detected:
+            raise RuntimeError("No NFC reader detected.")
 
-        return detected_readers[0]
+        return detected[0]
 
     def read_uid(self) -> str:
         if self.reader is None:
@@ -91,8 +97,7 @@ class RFIDReaderService:
             connection = self.reader.createConnection()
             connection.connect()
 
-            get_uid_apdu = [0xFF, 0xCA, 0x00, 0x00, 0x00]
-            data, sw1, sw2 = connection.transmit(get_uid_apdu)
+            data, sw1, sw2 = connection.transmit([0xFF, 0xCA, 0x00, 0x00, 0x00])
 
             if sw1 == 0x90 and sw2 == 0x00:
                 return self.to_hex_string(data)
@@ -106,15 +111,56 @@ class RFIDReaderService:
                 except Exception:
                     pass
 
-    def reader_loop(self):
+    def _try_connect_reader(self) -> bool:
+        """
+        Try once to find a reader.
+        Returns True on success, False if not plugged in yet.
+        Raises RuntimeError for unrecoverable errors (e.g. pyscard missing).
+        """
         try:
             self.reader = self.get_reader()
-            self.send_status(f"RFID reader connected: {self.reader}")
-            self.send_status("Ready. Tap NFC card.")
+            return True
+        except RuntimeError as error:
+            if "pyscard is not installed" in str(error):
+                raise
+            return False
 
-        except Exception as error:
-            self.running = False
-            self.send_status(f"Reader error: {error}")
+    # ──────────────────────────────────────────────────────────────
+    # Wait-for-reader loop  (logs ONE message, then silently retries)
+    # ──────────────────────────────────────────────────────────────
+
+    def _wait_for_reader(self, *, on_reconnect: bool = False) -> bool:
+        """
+        Block until a reader is found or self.running goes False.
+        Emits a single status message, then retries silently.
+        Returns True when a reader is connected, False if stopped.
+        """
+        if on_reconnect:
+            self.send_status("RFID reader disconnected. Detecting reader...")
+        else:
+            self.send_status("Detecting RFID reader...")
+
+        while self.running:
+            try:
+                if self._try_connect_reader():
+                    self.send_status(f"RFID reader connected: {self.reader}")
+                    self.send_status("Ready. Tap NFC card.")
+                    return True
+            except RuntimeError as error:
+                self.running = False
+                self.send_status(f"Fatal reader error: {error}")
+                return False
+
+            time.sleep(RECONNECT_INTERVAL)
+
+        return False
+
+    # ──────────────────────────────────────────────────────────────
+    # Main loop
+    # ──────────────────────────────────────────────────────────────
+
+    def reader_loop(self):
+        if not self._wait_for_reader():
             return
 
         while self.running:
@@ -129,9 +175,7 @@ class RFIDReaderService:
                 self.last_uid = uid
                 self.last_tap_time = current_time
 
-                self.send_status(f"Card detected: {uid}")
                 self.send_uid(uid)
-
                 time.sleep(0.5)
 
             except NoCardException:
@@ -143,7 +187,7 @@ class RFIDReaderService:
             except Exception as error:
                 error_message = str(error)
 
-                no_card_messages = [
+                no_card_keywords = [
                     "No card",
                     "Card is unresponsive",
                     "Card connection failed",
@@ -152,12 +196,39 @@ class RFIDReaderService:
                     "SCARD_W_REMOVED_CARD",
                 ]
 
-                if any(message in error_message for message in no_card_messages):
+                if any(k in error_message for k in no_card_keywords):
                     time.sleep(0.2)
+                    continue
+
+                disconnect_keywords = [
+                    "SCARD_E_NO_READERS_AVAILABLE",
+                    "SCARD_E_READER_UNAVAILABLE",
+                    "No reader",
+                    "reader removed",
+                    "device has been disconnected",
+                    "Device not found",
+                ]
+
+                is_disconnect = any(k in error_message for k in disconnect_keywords)
+
+                if not is_disconnect:
+                    try:
+                        is_disconnect = not readers()
+                    except Exception:
+                        is_disconnect = True
+
+                if is_disconnect:
+                    self.reader = None
+                    if not self._wait_for_reader(on_reconnect=True):
+                        return
                     continue
 
                 self.send_status(f"RFID read error: {error_message}")
                 time.sleep(1)
+
+    # ──────────────────────────────────────────────────────────────
+    # Helpers
+    # ──────────────────────────────────────────────────────────────
 
     def is_duplicate_tap(self, uid: str, current_time: float) -> bool:
         return (
