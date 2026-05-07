@@ -1,12 +1,24 @@
+import logging
 import time
+from typing import Dict, Optional
 
 from attendance_service import AttendanceService
 from database import DatabaseManager
 from rfid_reader import RFIDReaderService
 
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+
 class AttendanceBackend:
     def __init__(self):
+        logger.info("Initializing Attendance Backend...")
+
         self.database_manager = DatabaseManager()
         self.attendance_service = AttendanceService(self.database_manager)
 
@@ -15,12 +27,18 @@ class AttendanceBackend:
             on_status_callback=self.show_status,
         )
 
+        logger.info("Attendance Backend initialized successfully.")
+
     @staticmethod
     def show_status(message: str):
+        logger.info("RFID Reader Status: %s", message)
         print(f"[STATUS] {message}")
 
     @staticmethod
-    def format_full_name(person: dict) -> str:
+    def format_full_name(person: Optional[Dict]) -> str:
+        if not person:
+            return "N/A"
+
         last_name = person.get("last_name") or ""
         first_name = person.get("first_name") or ""
         middle_name = person.get("middle_name") or ""
@@ -40,29 +58,73 @@ class AttendanceBackend:
         if suffix:
             name_parts.append(suffix)
 
+        if not name_parts:
+            return "N/A"
+
         return ", ".join(name_parts[:1]) + (
             f", {' '.join(name_parts[1:])}" if len(name_parts) > 1 else ""
-        ) or "N/A"
+        )
 
     def handle_uid(self, uid: str):
         print()
         print(f"[SCAN] UID detected: {uid}")
 
-        # Save latest tapped RFID UID for PHP Add Student form auto-fill.
-        self.database_manager.save_rfid_uid_to_buffer(uid)
+        logger.info("=" * 70)
+        logger.info("New RFID scan received.")
+        logger.info("UID received from reader: %s", uid)
 
-        result = self.attendance_service.process_rfid_tap(uid)
+        try:
+            # IMPORTANT:
+            # Do not call save_rfid_uid_to_buffer() here anymore.
+            # AttendanceService.process_rfid_tap() already saves the UID to the buffer.
+            # Calling it here also will create duplicate buffer logs.
+            result = self.attendance_service.process_rfid_tap(uid)
 
-        if not result.get("success"):
-            print(f"[FAILED] {result.get('message', 'Unknown error occurred.')}")
+        except Exception as error:
+            logger.error(
+                "Unexpected error while processing RFID UID=%s. Error=%s",
+                uid,
+                error,
+                exc_info=True,
+            )
+
+            print(f"[STATUS] RFID read error: {error}")
             print("-" * 60)
             return
 
-        person = result.get("person", {})
-        person_type = result.get("person_type", "Unknown")
+        if not result.get("success"):
+            message = result.get("message", "Unknown error occurred.")
+
+            logger.warning(
+                "RFID scan failed. UID=%s, message=%s",
+                uid,
+                message,
+            )
+
+            print(f"[FAILED] {message}")
+            print("-" * 60)
+            return
+
+        person = result.get("person") or {}
+        person_type = result.get("person_type") or "Unknown"
         full_name = self.format_full_name(person)
 
-        print(f"[SUCCESS] {result.get('message', 'Attendance recorded successfully.')}")
+        action = result.get("action", "N/A")
+        recorded_time = result.get("time", "N/A")
+        message = result.get("message", "Attendance recorded successfully.")
+
+        logger.info(
+            "RFID scan processed successfully. UID=%s, person_type=%s, "
+            "person_id=%s, full_name=%s, action=%s, time=%s",
+            uid,
+            person_type,
+            person.get("id"),
+            full_name,
+            action,
+            recorded_time,
+        )
+
+        print(f"[SUCCESS] {message}")
         print(f"Name       : {full_name}")
         print(f"Type       : {person_type}")
 
@@ -75,27 +137,72 @@ class AttendanceBackend:
             print(f"ID Number  : {person.get('employee_number', 'N/A')}")
             print(f"Position   : {person.get('position', 'N/A')}")
 
+        else:
+            logger.warning(
+                "Unknown person type returned from attendance service. UID=%s, person_type=%s",
+                uid,
+                person_type,
+            )
+
         print(f"Department : {person.get('department', 'N/A')}")
-        print(f"Action     : {result.get('action', 'N/A')}")
-        print(f"Time       : {result.get('time', 'N/A')}")
+        print(f"Action     : {action}")
+        print(f"Time       : {recorded_time}")
         print("-" * 60)
 
+        logger.info("RFID scan handling completed.")
+        logger.info("=" * 70)
+
     def run(self):
+        logger.info("Starting NFC Attendance Backend...")
+
         print("Starting NFC Attendance Backend...")
         print("Press CTRL + C to stop.")
         print()
 
-        self.rfid_reader.start()
-
         try:
+            self.rfid_reader.start()
+            logger.info("RFID reader started successfully.")
+
             while True:
                 time.sleep(1)
 
         except KeyboardInterrupt:
             print()
             print("Stopping backend...")
-            self.rfid_reader.stop()
+
+            logger.info("Keyboard interrupt received. Stopping backend...")
+
+            try:
+                self.rfid_reader.stop()
+                logger.info("RFID reader stopped successfully.")
+
+            except Exception as error:
+                logger.error(
+                    "Error while stopping RFID reader. Error=%s",
+                    error,
+                    exc_info=True,
+                )
+
             print("Backend stopped.")
+            logger.info("Backend stopped.")
+
+        except Exception as error:
+            logger.critical(
+                "Fatal backend error. Error=%s",
+                error,
+                exc_info=True,
+            )
+
+            print(f"[ERROR] Fatal backend error: {error}")
+
+            try:
+                self.rfid_reader.stop()
+
+            except Exception:
+                logger.error(
+                    "Failed to stop RFID reader after fatal error.",
+                    exc_info=True,
+                )
 
 
 def main():

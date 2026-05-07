@@ -1,7 +1,9 @@
 -- Fixed SQL dump for direct import
 -- Adds database creation, disables foreign key checks during import,
--- and ensures FK on `users.employee_id` is created after referenced indexes.
+-- adds RFID UID buffer table with used_by_student_id,
+-- and ensures FK constraints are created after referenced indexes.
 -- Generated: May 04, 2026
+-- Updated: May 07, 2026
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -20,9 +22,13 @@ USE `rfid_attendance`;
 -- Disable foreign key checks for safe import ordering
 SET FOREIGN_KEY_CHECKS=0;
 
+-- --------------------------------------------------------
+
 --
 -- Table structure for table `attendance_logs`
 --
+
+DROP TABLE IF EXISTS `attendance_logs`;
 
 CREATE TABLE `attendance_logs` (
   `id` int(11) NOT NULL,
@@ -40,7 +46,17 @@ CREATE TABLE `attendance_logs` (
 -- Dumping data for table `attendance_logs`
 --
 
-INSERT INTO `attendance_logs` (`id`, `student_id`, `employee_id`, `log_date`, `time_in`, `time_out`, `status`, `created_at`, `updated_at`) VALUES
+INSERT INTO `attendance_logs` (
+  `id`,
+  `student_id`,
+  `employee_id`,
+  `log_date`,
+  `time_in`,
+  `time_out`,
+  `status`,
+  `created_at`,
+  `updated_at`
+) VALUES
 (1, 1, NULL, '2026-04-28', '08:00:00', '12:00:00', 'Timed Out', '2026-04-28 14:51:42', '2026-04-28 14:51:42'),
 (2, 2, NULL, '2026-04-28', '09:15:00', NULL, 'Timed In', '2026-04-28 14:51:42', '2026-04-28 14:51:42'),
 (3, NULL, 1, '2026-04-28', '07:30:00', '16:30:00', 'Timed Out', '2026-04-28 14:51:42', '2026-04-28 14:51:42'),
@@ -52,6 +68,8 @@ INSERT INTO `attendance_logs` (`id`, `student_id`, `employee_id`, `log_date`, `t
 -- Table structure for table `employees`
 --
 
+DROP TABLE IF EXISTS `employees`;
+
 CREATE TABLE `employees` (
   `id` int(11) NOT NULL,
   `employee_number` varchar(50) NOT NULL,
@@ -61,19 +79,30 @@ CREATE TABLE `employees` (
   `suffix` varchar(10) DEFAULT NULL,
   `department` varchar(100) DEFAULT NULL,
   `position` varchar(100) DEFAULT NULL,
-  `rfid_uid` varchar(100) NOT NULL,
+  `rfid_uid` varchar(255) DEFAULT NULL,
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-ALTER TABLE `employees` MODIFY `rfid_uid` VARCHAR(255) NULL DEFAULT NULL;
-
 --
 -- Dumping data for table `employees`
 --
 
-INSERT INTO `employees` (`id`, `employee_number`, `last_name`, `first_name`, `middle_name`, `suffix`, `department`, `position`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
+INSERT INTO `employees` (
+  `id`,
+  `employee_number`,
+  `last_name`,
+  `first_name`,
+  `middle_name`,
+  `suffix`,
+  `department`,
+  `position`,
+  `rfid_uid`,
+  `is_active`,
+  `created_at`,
+  `updated_at`
+) VALUES
 (1, 'EMP-101', 'Villanueva', 'Elena', 'Cruz', NULL, 'Registrar', 'Clerk', 'I9J0K1L2', 1, '2026-04-28 14:50:58', '2026-04-28 14:50:58'),
 (2, 'EMP-102', 'Garcia', 'Ricardo', 'Perez', NULL, 'IT Dept', 'IT Officer I', 'M3N4O5P6', 1, '2026-04-28 14:50:58', '2026-04-28 14:50:58');
 
@@ -82,6 +111,8 @@ INSERT INTO `employees` (`id`, `employee_number`, `last_name`, `first_name`, `mi
 --
 -- Table structure for table `rfid_scan_logs`
 --
+
+DROP TABLE IF EXISTS `rfid_scan_logs`;
 
 CREATE TABLE `rfid_scan_logs` (
   `id` int(11) NOT NULL,
@@ -99,33 +130,80 @@ CREATE TABLE `rfid_scan_logs` (
 -- Table structure for table `students`
 --
 
+DROP TABLE IF EXISTS `students`;
+
 CREATE TABLE `students` (
-  `id`             int(11)       NOT NULL AUTO_INCREMENT,
-  `student_number` varchar(50)   NOT NULL,
-  `category`       varchar(50)   DEFAULT NULL,
-  `last_name`      varchar(100)  NOT NULL,
-  `first_name`     varchar(100)  NOT NULL,
-  `middle_name`    varchar(100)  DEFAULT NULL,
-  `suffix`         varchar(10)   DEFAULT NULL,
-  `program`         varchar(100)  DEFAULT NULL,
-  `year_level`     varchar(50)   DEFAULT NULL,
-  `strand`         varchar(150)  DEFAULT NULL,
-  `department`     varchar(100)  DEFAULT NULL,
-  `rfid_uid`       varchar(255)  DEFAULT NULL,
-  `is_active`      tinyint(1)    NOT NULL DEFAULT 1,
-  `created_at`     datetime      DEFAULT current_timestamp(),
-  `updated_at`     datetime      DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `student_number` (`student_number`),
-  UNIQUE KEY `rfid_uid` (`rfid_uid`)
+  `id` int(11) NOT NULL,
+  `student_number` varchar(50) NOT NULL,
+  `category` varchar(50) DEFAULT NULL,
+  `last_name` varchar(100) NOT NULL,
+  `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(100) DEFAULT NULL,
+  `suffix` varchar(10) DEFAULT NULL,
+  `program` varchar(100) DEFAULT NULL,
+  `year_level` varchar(50) DEFAULT NULL,
+  `strand` varchar(150) DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
+  `rfid_uid` varchar(255) DEFAULT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `students`
 --
-INSERT INTO `students` (`id`, `student_number`, `category`, `last_name`, `first_name`, `middle_name`, `suffix`, `program`, `year_level`, `strand`, `department`, `rfid_uid`, `is_active`, `created_at`, `updated_at`) VALUES
+
+INSERT INTO `students` (
+  `id`,
+  `student_number`,
+  `category`,
+  `last_name`,
+  `first_name`,
+  `middle_name`,
+  `suffix`,
+  `program`,
+  `year_level`,
+  `strand`,
+  `department`,
+  `rfid_uid`,
+  `is_active`,
+  `created_at`,
+  `updated_at`
+) VALUES
 (1, '2024-0001', 'Tertiary', 'Santos', 'Maria', 'Clara', NULL, 'BSIT', '2nd Year', NULL, 'CICS', 'A1B2C3D4', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03'),
 (2, '2024-0002', 'Tertiary', 'Reyes', 'Juan', 'Luna', NULL, 'BSCS', '1st Year', NULL, 'CICS', 'E5F6G7H8', 1, '2026-04-28 14:50:03', '2026-04-28 14:50:03');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `rfid_uid_buffer`
+--
+
+DROP TABLE IF EXISTS `rfid_uid_buffer`;
+
+CREATE TABLE `rfid_uid_buffer` (
+  `id` int(11) NOT NULL,
+  `rfid_uid` varchar(255) NOT NULL,
+  `is_used` tinyint(1) NOT NULL DEFAULT 0,
+  `used_by_student_id` int(11) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Meaning:
+--
+-- rfid_uid:
+-- The UID scanned by the RFID reader.
+--
+-- is_used:
+-- 0 = RFID UID is not assigned to any student.
+-- 1 = RFID UID is already assigned to a student.
+--
+-- used_by_student_id:
+-- NULL = no student owns this RFID UID.
+-- Example: 2 = this RFID UID already belongs to student ID/index 2.
+--
 
 -- --------------------------------------------------------
 
@@ -133,8 +211,11 @@ INSERT INTO `students` (`id`, `student_number`, `category`, `last_name`, `first_
 -- Table structure for table `users`
 --
 
+DROP TABLE IF EXISTS `users`;
+
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
+  `employee_id` int(11) DEFAULT NULL,
   `username` varchar(50) NOT NULL,
   `last_name` varchar(100) NOT NULL,
   `first_name` varchar(100) NOT NULL,
@@ -148,16 +229,29 @@ CREATE TABLE `users` (
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- Add employee_id column now; create FK later after indexes exist
-ALTER TABLE users ADD COLUMN employee_id INT NULL AFTER id;
-
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `last_name`, `first_name`, `middle_name`, `suffix`, `email`, `password_hash`, `role`, `is_active`, `created_at`, `updated_at`) VALUES
-(1, 'supadmin', 'Doe', 'Jane', 'Smith', NULL, 'supadmin@gmail.com', 'hash_pw_123', 'Superadmin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04'),
-(2, 'admin', 'Brown', 'Robert', NULL, NULL, 'admin@gmail.com', 'hash_pw_456', 'Admin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04');
+INSERT INTO `users` (
+  `id`,
+  `employee_id`,
+  `username`,
+  `last_name`,
+  `first_name`,
+  `middle_name`,
+  `suffix`,
+  `email`,
+  `password_hash`,
+  `role`,
+  `is_active`,
+  `created_at`,
+  `updated_at`
+) VALUES
+(1, NULL, 'supadmin', 'Doe', 'Jane', 'Smith', NULL, 'supadmin@gmail.com', 'hash_pw_123', 'Superadmin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04'),
+(2, NULL, 'admin', 'Brown', 'Robert', NULL, NULL, 'admin@gmail.com', 'hash_pw_456', 'Admin', 1, '2026-04-28 14:49:04', '2026-04-28 14:49:04');
+
+-- --------------------------------------------------------
 
 --
 -- Indexes for dumped tables
@@ -194,12 +288,23 @@ ALTER TABLE `students`
   ADD UNIQUE KEY `rfid_uid` (`rfid_uid`);
 
 --
+-- Indexes for table `rfid_uid_buffer`
+--
+ALTER TABLE `rfid_uid_buffer`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `used_by_student_id` (`used_by_student_id`),
+  ADD KEY `rfid_uid` (`rfid_uid`);
+
+--
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `username` (`username`),
-  ADD UNIQUE KEY `email` (`email`);
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `employee_id` (`employee_id`);
+
+-- --------------------------------------------------------
 
 --
 -- AUTO_INCREMENT for dumped tables
@@ -230,10 +335,18 @@ ALTER TABLE `students`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
+-- AUTO_INCREMENT for table `rfid_uid_buffer`
+--
+ALTER TABLE `rfid_uid_buffer`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+-- --------------------------------------------------------
 
 --
 -- Constraints for dumped tables
@@ -243,14 +356,29 @@ ALTER TABLE `users`
 -- Constraints for table `attendance_logs`
 --
 ALTER TABLE `attendance_logs`
-  ADD CONSTRAINT `attendance_logs_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `attendance_logs_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE SET NULL;
+  ADD CONSTRAINT `attendance_logs_ibfk_1`
+  FOREIGN KEY (`student_id`) REFERENCES `students` (`id`)
+  ON DELETE SET NULL,
+  ADD CONSTRAINT `attendance_logs_ibfk_2`
+  FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`)
+  ON DELETE SET NULL;
 
 --
--- Constraints for table `users` (create after employees and users indexes exist)
+-- Constraints for table `rfid_uid_buffer`
+--
+ALTER TABLE `rfid_uid_buffer`
+  ADD CONSTRAINT `fk_rfid_uid_buffer_student`
+  FOREIGN KEY (`used_by_student_id`) REFERENCES `students` (`id`)
+  ON DELETE SET NULL;
+
+--
+-- Constraints for table `users`
 --
 ALTER TABLE `users`
-  ADD CONSTRAINT `fk_users_employee` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
+  ADD CONSTRAINT `fk_users_employee`
+  FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`)
+  ON DELETE SET NULL;
+
 COMMIT;
 
 -- Re-enable foreign key checks after import
