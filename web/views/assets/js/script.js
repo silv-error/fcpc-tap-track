@@ -2324,7 +2324,7 @@ async function handleImportFile(file) {
   formData.append('file', file);
 
   try {
-    const response = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json' }, body: formData });
+    const response = await fetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'X-CSRF-Token': getCsrfToken() }, body: formData });
     const payload  = await response.json();
     if (!response.ok || !payload.success) throw new Error(payload.message || `Import failed (${response.status})`);
 
