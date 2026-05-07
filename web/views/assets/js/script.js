@@ -2097,17 +2097,11 @@ function closeEditStudentModal() {
 
 function clearEditStudentRfid() {
   const rfidInput = document.getElementById('editStudentRfid');
-  const modal = document.getElementById('editStudentModal');
   
   if (rfidInput) {
     rfidInput.value = '';
     rfidInput.placeholder = 'Tap RFID card or use clear button...';
     rfidInput.readOnly = true;
-  }
-  
-  // Also clear from the modal record to prevent it from being restored
-  if (modal && modal._record) {
-    modal._record.rfid_uid = '';
   }
   
   showToast('RFID UID cleared. Ready to scan.', 'info');
@@ -2176,6 +2170,20 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function closeAddStudentModal() { document.getElementById('addStudentModal')?.classList.remove('show'); }
+
+function clearAddRfid(fieldId) {
+  const rfidInput = document.getElementById(fieldId);
+  if (rfidInput) {
+    rfidInput.value = '';
+    rfidInput.placeholder = 'Tap RFID card to scan...';
+    rfidInput.readOnly = true;
+    showToast('RFID UID cleared. Ready to scan.', 'info');
+    // Re-enable auto-fetch after clearing
+    if (window.startRfidAutoFetch) {
+      setTimeout(() => window.startRfidAutoFetch(), 300);
+    }
+  }
+}
 
 async function saveAddStudent() {
   const get = (id) => document.getElementById(id)?.value.trim() || '';
@@ -2282,17 +2290,11 @@ function closeEditEmployeeModal() {
 
 function clearEditEmployeeRfid() {
   const rfidInput = document.getElementById('editEmployeeRfid');
-  const modal = document.getElementById('editEmployeeModal');
   
   if (rfidInput) {
     rfidInput.value = '';
     rfidInput.placeholder = 'Tap RFID card or use clear button...';
     rfidInput.readOnly = true;
-  }
-  
-  // Also clear from the modal record to prevent it from being restored
-  if (modal && modal._record) {
-    modal._record.rfid_uid = '';
   }
   
   showToast('RFID UID cleared. Ready to scan.', 'info');
