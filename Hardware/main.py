@@ -3,10 +3,10 @@ main.py  (modified)
 
 Changes from original:
 - Imports AttendanceUI and passes it to AttendanceBackend.
-- AttendanceBackend now calls ui.post_event() / ui.post_attendance()
-  after every RFID result so the window stays in sync.
-- The UI window is launched on the main thread; the backend reader
-  runs in a daemon thread via ui.launch(backend_start_fn=backend.run).
+- AttendanceBackend calls ui.post_event() after every RFID result
+  and ui.post_system() for reader status messages.
+- The UI window runs on the main thread; the backend reader runs
+  in a daemon thread via ui.launch(backend_start_fn=backend.run).
 """
 
 import logging
@@ -58,11 +58,7 @@ class AttendanceBackend:
         middle_name = person.get("middle_name") or ""
         suffix      = person.get("suffix") or ""
 
-        name_parts = []
-        if last_name:  name_parts.append(last_name)
-        if first_name: name_parts.append(first_name)
-        if middle_name: name_parts.append(middle_name)
-        if suffix:     name_parts.append(suffix)
+        name_parts = [p for p in [last_name, first_name, middle_name, suffix] if p]
 
         if not name_parts:
             return "N/A"
@@ -89,29 +85,21 @@ class AttendanceBackend:
             print("-" * 60)
             return
 
-        success     = result.get("success", False)
-        message     = result.get("message", "Unknown error occurred.")
-        action      = result.get("action") or ""
-        person      = result.get("person") or {}
-        person_type = result.get("person_type") or "Unknown"
+        success       = result.get("success", False)
+        message       = result.get("message", "Unknown error occurred.")
+        action        = result.get("action") or ""
+        person        = result.get("person") or {}
+        person_type   = result.get("person_type") or "Unknown"
         recorded_time = result.get("time") or ""
-        full_name   = self.format_full_name(person)
+        full_name     = self.format_full_name(person)
 
-        # ── post to UI ───────────────────────────────────────────────
+        # ── post to debug UI ─────────────────────────────────────────
         self.ui.post_event(
             success=success,
             text=message,
             uid=uid,
             action=action if success else None,
         )
-
-        if success and action in ("TIME_IN", "TIME_OUT"):
-            self.ui.post_attendance(
-                name=full_name,
-                person_type=person_type,
-                action=action,
-                recorded_time=recorded_time,
-            )
 
         # ── console output (unchanged) ───────────────────────────────
         if not success:
@@ -190,9 +178,6 @@ class AttendanceBackend:
 def main():
     ui = AttendanceUI()
     backend = AttendanceBackend(ui=ui)
-
-    # backend.run() is called inside a daemon thread by ui.launch()
-    # so the tkinter main loop stays on the main thread.
     ui.launch(backend_start_fn=backend.run)
 
 
