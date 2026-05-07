@@ -1,13 +1,3 @@
-"""
-attendance_ui.py
-
-Server-side debug monitor for the RFID Attendance System.
-Industrial control-panel aesthetic — clean, dense, professional.
-
-Standalone demo:  python attendance_ui.py
-Backend usage:    ui.launch(backend_start_fn=backend.run)
-"""
-
 import queue
 import threading
 import traceback
@@ -16,10 +6,6 @@ from tkinter import font as tkfont
 from datetime import datetime
 from typing import Optional, Set
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Design tokens
-# ──────────────────────────────────────────────────────────────────────────────
 
 C_BG = "#0e1015"
 C_SURFACE = "#14171f"
@@ -57,95 +43,23 @@ LEVEL_META = {
     "SYSTEM": (C_SLATE, "SYS"),
 }
 
-COLS = [
-    ("#", 36, 10),
-    ("TIME", 62, 8),
-    ("LVL", 26, 8),
-    ("TAG", 54, 8),
-    ("UID", 70, 8),
-    ("ACTION", 72, 8),
-    ("MESSAGE", 0, 10),
-]
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _mono(size: int, bold: bool = False) -> tuple:
-    return (F_MONO, size, "bold" if bold else "normal")
-
 
 class _Sep(tk.Frame):
-    def __init__(self, parent, color=C_BORDER, **kw):
-        super().__init__(parent, bg=color, height=1, **kw)
+    def __init__(self, parent, color=C_BORDER, **kwargs):
+        super().__init__(parent, bg=color, height=1, **kwargs)
         self.pack(fill="x")
 
 
 class _VLine(tk.Frame):
-    def __init__(self, parent, color=C_BORDER, **kw):
-        super().__init__(parent, bg=color, width=1, **kw)
+    def __init__(self, parent, color=C_BORDER, **kwargs):
+        super().__init__(parent, bg=color, width=1, **kwargs)
         self.pack(side="left", fill="y", padx=0)
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Scrollable canvas
-# ──────────────────────────────────────────────────────────────────────────────
-
-class _Scroller(tk.Frame):
-    def __init__(self, parent, bg=C_SURFACE, **kw):
-        super().__init__(parent, bg=bg, **kw)
-
-        self._cv = tk.Canvas(self, bg=bg, highlightthickness=0, bd=0)
-        self._sb = tk.Scrollbar(
-            self,
-            orient="vertical",
-            command=self._cv.yview,
-            bg=C_SURFACE,
-            troughcolor=C_BG,
-            activebackground=C_TEAL,
-            width=10,
-        )
-        self._inner = tk.Frame(self._cv, bg=bg)
-
-        self._inner.bind(
-            "<Configure>",
-            lambda _: self._cv.configure(scrollregion=self._cv.bbox("all")),
-        )
-
-        self._wid = self._cv.create_window((0, 0), window=self._inner, anchor="nw")
-        self._cv.configure(yscrollcommand=self._sb.set)
-
-        self._cv.pack(side="left", fill="both", expand=True)
-        self._sb.pack(side="right", fill="y")
-
-        self._cv.bind(
-            "<Configure>",
-            lambda e: self._cv.itemconfig(self._wid, width=e.width),
-        )
-
-        for widget in (self._inner, self._cv):
-            widget.bind(
-                "<MouseWheel>",
-                lambda e: self._cv.yview_scroll(int(-1 * (e.delta / 120)), "units"),
-            )
-
-    @property
-    def inner(self):
-        return self._inner
-
-    def to_bottom(self):
-        self._cv.yview_moveto(1.0)
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Pulsing dot widget
-# ──────────────────────────────────────────────────────────────────────────────
 
 class _PulseDot(tk.Canvas):
     RADIUS = 5
 
-    def __init__(self, parent, **kw):
+    def __init__(self, parent, **kwargs):
         size = self.RADIUS * 2 + 2
 
         super().__init__(
@@ -154,7 +68,7 @@ class _PulseDot(tk.Canvas):
             height=size,
             bg=C_SURFACE,
             highlightthickness=0,
-            **kw,
+            **kwargs,
         )
 
         self._dot = self.create_oval(
@@ -165,6 +79,7 @@ class _PulseDot(tk.Canvas):
             fill=C_SLATE,
             outline="",
         )
+
         self._color = C_SLATE
         self._pulsing = False
         self._pulse_state = False
@@ -202,10 +117,6 @@ class _PulseDot(tk.Canvas):
         self.itemconfig(self._dot, fill=color)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Hardware reader watcher
-# ──────────────────────────────────────────────────────────────────────────────
-
 class _ReaderWatcher:
     POLL_MS = 800
 
@@ -221,6 +132,8 @@ class _ReaderWatcher:
     def start(self):
         if self._thread and self._thread.is_alive():
             return
+
+        self._stop.clear()
 
         self._thread = threading.Thread(
             target=self._run,
@@ -270,54 +183,16 @@ class _ReaderWatcher:
             self._stop.wait(self.POLL_MS / 1000)
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Column cell helper
-# ──────────────────────────────────────────────────────────────────────────────
-
-def _cell(parent, text, col_idx, bg, fg, font, anchor="w", right_pad=0):
-    _, px_w, lpad = COLS[col_idx]
-    is_last = px_w == 0
-
-    if is_last:
-        label = tk.Label(
-            parent,
-            text=text,
-            font=font,
-            bg=bg,
-            fg=fg,
-            anchor=anchor,
-        )
-        label.pack(side="left", padx=(lpad, right_pad), fill="x", expand=True)
-        return label
-
-    frame = tk.Frame(parent, bg=bg, width=px_w)
-    frame.pack_propagate(False)
-    frame.pack(side="left", padx=(lpad, 0), fill="y")
-
-    label = tk.Label(
-        frame,
-        text=text,
-        font=font,
-        bg=bg,
-        fg=fg,
-        anchor=anchor,
-    )
-    label.pack(fill="both", expand=True)
-
-    return label
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Main UI class
-# ──────────────────────────────────────────────────────────────────────────────
-
 class AttendanceUI:
     def __init__(self):
         self._q: queue.Queue = queue.Queue()
-        self._rows: list = []
-        self._row_idx: int = 0
-        self._reader_detecting: bool = False
+        self._row_idx = 0
+        self._log_line_count = 0
+
         self._backend_thread: Optional[threading.Thread] = None
+        self._backend_start_fn = None
+        self._backend_stop_fn = None
+        self._backend_running = False
 
         self.root = tk.Tk()
         self.root.title("RFID Attendance — Debug Monitor")
@@ -342,10 +217,6 @@ class AttendanceUI:
         )
         self._watcher.start()
 
-    # ──────────────────────────────────────────
-    # Fonts
-    # ──────────────────────────────────────────
-
     def _build_fonts(self):
         def make_font(size, bold=False):
             weight = "bold" if bold else "normal"
@@ -362,10 +233,6 @@ class AttendanceUI:
         self.fnt_badge = make_font(SZ_BADGE, bold=True)
         self.fnt_clock = make_font(SZ_CLOCK)
         self.fnt_dim = make_font(SZ_LABEL)
-
-    # ──────────────────────────────────────────
-    # Layout
-    # ──────────────────────────────────────────
 
     def _build_ui(self):
         self._build_header()
@@ -499,30 +366,87 @@ class AttendanceUI:
         ).pack(side="right")
 
     def _build_log_header(self):
+        header_text = (
+            f"{'#':>4}  "
+            f"{'TIME':<8}  "
+            f"{'LVL':<3}  "
+            f"{'TAG':<8}  "
+            f"{'UID':<10}  "
+            f"{'ACTION':<10}  "
+            f"MESSAGE"
+        )
+
         bar = tk.Frame(self.root, bg=C_BG)
         bar.pack(fill="x")
 
-        _cell(bar, "#", 0, C_BG, C_TEXT_3, self.fnt_dim, anchor="e")
-        _cell(bar, "TIME", 1, C_BG, C_TEXT_3, self.fnt_dim)
-        _cell(bar, "LVL", 2, C_BG, C_TEXT_3, self.fnt_dim)
-        _cell(bar, "TAG", 3, C_BG, C_TEXT_3, self.fnt_dim)
-        _cell(bar, "UID", 4, C_BG, C_TEXT_3, self.fnt_dim)
-        _cell(bar, "ACTION", 5, C_BG, C_TEXT_3, self.fnt_dim)
-        _cell(bar, "MESSAGE", 6, C_BG, C_TEXT_3, self.fnt_dim, right_pad=12)
-
-        bar.configure(pady=4)
+        tk.Label(
+            bar,
+            text=header_text,
+            font=self.fnt_dim,
+            bg=C_BG,
+            fg=C_TEXT_3,
+            anchor="w",
+            padx=14,
+            pady=4,
+        ).pack(fill="x")
 
     def _build_log_area(self):
         wrapper = tk.Frame(self.root, bg=C_BG)
         wrapper.pack(fill="both", expand=True)
 
-        self._scroller = _Scroller(wrapper, bg=C_BG)
-        self._scroller.pack(fill="both", expand=True)
+        self._log_text = tk.Text(
+            wrapper,
+            bg=C_BG,
+            fg=C_TEXT_1,
+            insertbackground=C_TEXT_1,
+            font=self.fnt_log,
+            bd=0,
+            highlightthickness=0,
+            wrap="none",
+            state="disabled",
+            padx=14,
+            pady=6,
+        )
+
+        scrollbar_y = tk.Scrollbar(
+            wrapper,
+            orient="vertical",
+            command=self._log_text.yview,
+            bg=C_SURFACE,
+            troughcolor=C_BG,
+            activebackground=C_TEAL,
+            width=10,
+        )
+
+        scrollbar_x = tk.Scrollbar(
+            wrapper,
+            orient="horizontal",
+            command=self._log_text.xview,
+            bg=C_SURFACE,
+            troughcolor=C_BG,
+            activebackground=C_TEAL,
+            width=10,
+        )
+
+        self._log_text.configure(
+            yscrollcommand=scrollbar_y.set,
+            xscrollcommand=scrollbar_x.set,
+        )
+
+        self._log_text.pack(side="left", fill="both", expand=True)
+        scrollbar_y.pack(side="right", fill="y")
+        scrollbar_x.pack(side="bottom", fill="x")
+
+        self._log_text.tag_configure("SUCCESS", foreground=C_GREEN)
+        self._log_text.tag_configure("ERROR", foreground=C_RED)
+        self._log_text.tag_configure("WARN", foreground=C_AMBER)
+        self._log_text.tag_configure("INFO", foreground=C_BLUE)
+        self._log_text.tag_configure("SYSTEM", foreground=C_SLATE)
 
     def _build_footer(self):
         _Sep(self.root, color=C_BORDER)
 
-        bar = tk.Frame(self.root, bg=C_SURFACE, height=30)
+        bar = tk.Frame(self.root, bg=C_SURFACE, height=34)
         bar.pack(fill="x")
         bar.pack_propagate(False)
 
@@ -541,7 +465,42 @@ class AttendanceUI:
             bd=0,
             cursor="hand2",
         )
-        checkbox.pack(side="left", padx=14, pady=4)
+        checkbox.pack(side="left", padx=14, pady=5)
+
+        self._start_btn = tk.Button(
+            bar,
+            text="START",
+            font=self.fnt_badge,
+            bg=C_RAISED,
+            fg=C_GREEN,
+            bd=0,
+            padx=14,
+            pady=1,
+            activebackground=C_BORDER,
+            activeforeground=C_GREEN,
+            cursor="hand2",
+            relief="flat",
+            command=self._start_backend_from_button,
+        )
+        self._start_btn.pack(side="left", padx=(4, 6), pady=5)
+
+        self._stop_btn = tk.Button(
+            bar,
+            text="STOP",
+            font=self.fnt_badge,
+            bg=C_RAISED,
+            fg=C_TEXT_3,
+            bd=0,
+            padx=14,
+            pady=1,
+            activebackground=C_BORDER,
+            activeforeground=C_RED,
+            cursor="hand2",
+            relief="flat",
+            command=self._stop_backend_from_button,
+            state="disabled",
+        )
+        self._stop_btn.pack(side="left", padx=(0, 10), pady=5)
 
         tk.Button(
             bar,
@@ -551,30 +510,26 @@ class AttendanceUI:
             fg=C_AMBER,
             bd=0,
             padx=12,
-            pady=0,
+            pady=1,
             activebackground=C_BORDER,
             activeforeground=C_AMBER,
             cursor="hand2",
             relief="flat",
             command=self._clear,
-        ).pack(side="right", padx=14, pady=4)
-
-    # ──────────────────────────────────────────
-    # Clock
-    # ──────────────────────────────────────────
+        ).pack(side="right", padx=14, pady=5)
 
     def _tick_clock(self):
         self._clock_var.set(datetime.now().strftime("%Y-%m-%d   %H:%M:%S"))
         self.root.after(1000, self._tick_clock)
 
-    # ──────────────────────────────────────────
-    # Queue pump
-    # ──────────────────────────────────────────
-
     def _pump(self):
+        handled = 0
+        max_per_pump = 100
+
         try:
-            while True:
+            while handled < max_per_pump:
                 self._handle(self._q.get_nowait())
+                handled += 1
         except queue.Empty:
             pass
 
@@ -589,10 +544,8 @@ class AttendanceUI:
             self._update_scan_status(msg)
         elif kind == "reader":
             self._update_reader_status(msg)
-
-    # ──────────────────────────────────────────
-    # Row renderer
-    # ──────────────────────────────────────────
+        elif kind == "backend_buttons":
+            self._apply_backend_buttons(msg.get("running", False))
 
     def _append(self, msg: dict):
         level = msg.get("level", "INFO")
@@ -602,57 +555,34 @@ class AttendanceUI:
         uid = msg.get("uid", "")
         action = msg.get("action", "")
 
-        color, abbrev = LEVEL_META.get(level, (C_SLATE, "???"))
-        row_bg = C_BG if self._row_idx % 2 == 0 else C_SURFACE
+        _, abbrev = LEVEL_META.get(level, (C_SLATE, "???"))
 
-        row = tk.Frame(self._scroller.inner, bg=row_bg, pady=1)
-        row.pack(fill="x")
-
-        _cell(row, f"{self._row_idx + 1}", 0, row_bg, C_TEXT_3, self.fnt_log, anchor="e")
-        _cell(row, ts, 1, row_bg, C_TEXT_3, self.fnt_log)
-        _cell(row, abbrev, 2, row_bg, color, self.fnt_badge)
-        _cell(row, tag[:8] if tag else "", 3, row_bg, C_SLATE, self.fnt_log)
-        _cell(row, uid[:10] if uid else "", 4, row_bg, C_TEXT_3, self.fnt_log)
-
-        _, px_w, lpad = COLS[5]
-
-        action_frame = tk.Frame(row, bg=row_bg, width=px_w)
-        action_frame.pack_propagate(False)
-        action_frame.pack(side="left", padx=(lpad, 0), fill="y")
-
-        if action:
-            action_color = C_GREEN if action == "TIME_IN" else C_TEAL
-
-            pill = tk.Label(
-                action_frame,
-                text=action,
-                font=self.fnt_badge,
-                bg=C_RAISED,
-                fg=action_color,
-                padx=4,
-                pady=1,
-            )
-            pill.place(relx=0.0, rely=0.5, anchor="w")
-
-        msg_fg = color if level in ("ERROR", "WARN") else C_TEXT_1
-        _cell(row, text, 6, row_bg, msg_fg, self.fnt_log, right_pad=12)
-
-        tk.Frame(self._scroller.inner, bg=C_BORDER, height=1).pack(fill="x")
-
-        self._rows.append(row)
         self._row_idx += 1
+        self._log_line_count += 1
+
+        line = (
+            f"{self._row_idx:>4}  "
+            f"{ts:<8}  "
+            f"{abbrev:<3}  "
+            f"{tag[:8]:<8}  "
+            f"{uid[:10]:<10}  "
+            f"{action[:10]:<10}  "
+            f"{text}\n"
+        )
+
+        self._log_text.configure(state="normal")
+        self._log_text.insert("end", line, level)
+
+        if self._log_line_count > MAX_ROWS:
+            self._log_text.delete("1.0", "2.0")
+            self._log_line_count -= 1
+
+        self._log_text.configure(state="disabled")
+
         self._count_var.set(str(self._row_idx))
 
-        if len(self._rows) > MAX_ROWS:
-            old_row = self._rows.pop(0)
-            old_row.destroy()
-
         if self._autoscroll.get():
-            self._scroller.to_bottom()
-
-    # ──────────────────────────────────────────
-    # Status updates
-    # ──────────────────────────────────────────
+            self._log_text.see("end")
 
     def _update_scan_status(self, msg: dict):
         success = msg.get("success", True)
@@ -684,10 +614,6 @@ class AttendanceUI:
             self._reader_var.set((label + "  —  detecting...")[:60])
             self._reader_dot.set_color(C_AMBER, pulse=True)
             self._reader_dot.start_pulse()
-
-    # ──────────────────────────────────────────
-    # Hardware watcher callbacks
-    # ──────────────────────────────────────────
 
     def _on_reader_connected(self, name: str):
         ts = datetime.now().strftime("%H:%M:%S")
@@ -737,16 +663,74 @@ class AttendanceUI:
         )
 
     def _clear(self):
-        for widget in list(self._scroller.inner.winfo_children()):
-            widget.destroy()
+        self._log_text.configure(state="normal")
+        self._log_text.delete("1.0", "end")
+        self._log_text.configure(state="disabled")
 
-        self._rows.clear()
         self._row_idx = 0
+        self._log_line_count = 0
         self._count_var.set("0")
 
-    # ──────────────────────────────────────────
-    # Public thread-safe API
-    # ──────────────────────────────────────────
+    def _queue_backend_button_state(self, running: bool):
+        self._q.put(
+            {
+                "kind": "backend_buttons",
+                "running": running,
+            }
+        )
+
+    def _apply_backend_buttons(self, running: bool):
+        self._backend_running = running
+
+        if not hasattr(self, "_start_btn") or not hasattr(self, "_stop_btn"):
+            return
+
+        if running:
+            self._start_btn.configure(state="disabled", fg=C_TEXT_3)
+            self._stop_btn.configure(state="normal", fg=C_RED)
+        else:
+            self._start_btn.configure(state="normal", fg=C_GREEN)
+            self._stop_btn.configure(state="disabled", fg=C_TEXT_3)
+
+    def _start_backend_from_button(self):
+        if self._backend_running:
+            self.post_log("WARN", "BACKEND", "Backend is already running.")
+            return
+
+        if not self._backend_start_fn:
+            self.post_log("ERROR", "BACKEND", "No backend start function was provided.")
+            return
+
+        self.post_system("Starting backend from UI button...")
+        self._apply_backend_buttons(True)
+
+        self._backend_thread = threading.Thread(
+            target=self._run_backend_safely,
+            args=(self._backend_start_fn,),
+            daemon=True,
+            name="AttendanceBackendThread",
+        )
+        self._backend_thread.start()
+
+    def _stop_backend_from_button(self):
+        if not self._backend_running:
+            self.post_log("WARN", "BACKEND", "Backend is already stopped.")
+            return
+
+        self.post_system("Stopping backend from UI button...")
+
+        try:
+            if self._backend_stop_fn:
+                self._backend_stop_fn()
+            else:
+                self.post_log("WARN", "BACKEND", "No backend stop function was provided.")
+
+        except Exception as exc:
+            self.post_log("ERROR", "BACKEND", f"Failed to stop backend: {exc}")
+
+        finally:
+            self._apply_backend_buttons(False)
+            self.post_system("Backend stop requested.")
 
     def post_event(
         self,
@@ -786,7 +770,7 @@ class AttendanceUI:
             self._q.put({"kind": "reader", "state": "detecting"})
 
         elif "connected:" in lowered_text:
-            name = text.split("connected:")[-1].strip() if "connected:" in text else ""
+            name = text.split("connected:")[-1].strip()
             self._q.put({"kind": "reader", "state": "connected", "name": name})
 
         elif "disconnected" in lowered_text:
@@ -827,17 +811,7 @@ class AttendanceUI:
             }
         )
 
-    # ──────────────────────────────────────────
-    # Backend runner
-    # ──────────────────────────────────────────
-
     def _run_backend_safely(self, backend_start_fn):
-        """
-        Run backend in a protected daemon thread.
-
-        This prevents backend exceptions from being hidden behind Tkinter mainloop.
-        Any crash will be printed in the terminal and also posted to the UI log.
-        """
         try:
             self.post_system("Backend thread starting...")
             backend_start_fn()
@@ -845,13 +819,6 @@ class AttendanceUI:
         except Exception as exc:
             error_text = f"Backend crashed: {exc}"
             full_traceback = traceback.format_exc()
-
-            print()
-            print("=" * 80)
-            print("[BACKEND THREAD ERROR]")
-            print(full_traceback)
-            print("=" * 80)
-            print()
 
             self.post_log("ERROR", "BACKEND", error_text)
 
@@ -861,27 +828,17 @@ class AttendanceUI:
                 self.post_log("ERROR", "TRACE", line[:180])
 
         finally:
+            self._queue_backend_button_state(False)
             self.post_system("Backend thread stopped.")
 
-    # ──────────────────────────────────────────
-    # Launch
-    # ──────────────────────────────────────────
+    def launch(self, backend_start_fn=None, backend_stop_fn=None, auto_start=False):
+        self._backend_start_fn = backend_start_fn
+        self._backend_stop_fn = backend_stop_fn
 
-    def launch(self, backend_start_fn=None):
-        """
-        Start the tkinter main loop.
+        self._apply_backend_buttons(False)
 
-        The UI runs on the main thread.
-        The RFID backend runs in a protected daemon thread.
-        """
-        if backend_start_fn:
-            self._backend_thread = threading.Thread(
-                target=self._run_backend_safely,
-                args=(backend_start_fn,),
-                daemon=True,
-                name="AttendanceBackendThread",
-            )
-            self._backend_thread.start()
+        if auto_start and backend_start_fn:
+            self._start_backend_from_button()
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -889,17 +846,9 @@ class AttendanceUI:
             self.root.mainloop()
 
         except KeyboardInterrupt:
-            print()
-            print("CTRL + C detected. Closing UI safely...")
             self._on_close()
 
         except Exception as error:
-            print()
-            print("=" * 80)
-            print("[UI MAINLOOP ERROR]")
-            print(traceback.format_exc())
-            print("=" * 80)
-
             try:
                 self.post_log("ERROR", "UI", f"UI crashed: {error}")
             except Exception:
@@ -909,29 +858,39 @@ class AttendanceUI:
 
     def _on_close(self):
         try:
+            if self._backend_running and self._backend_stop_fn:
+                self._backend_stop_fn()
+        except Exception:
+            pass
+
+        try:
             self._watcher.stop()
-        except Exception as exc:
-            print(f"[UI CLOSE ERROR] Failed to stop watcher: {exc}")
+        except Exception:
+            pass
 
         try:
             if self.root.winfo_exists():
                 self.root.quit()
                 self.root.destroy()
-        except Exception as exc:
-            print(f"[UI CLOSE ERROR] Failed to destroy window: {exc}")
+        except Exception:
+            pass
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Demo
-# ──────────────────────────────────────────────────────────────────────────────
 
 def _demo():
     import time
 
     ui = AttendanceUI()
 
-    def _feed():
-        time.sleep(2.0)
+    demo_running = {
+        "value": False,
+    }
+
+    def demo_backend_start():
+        if demo_running["value"]:
+            return
+
+        demo_running["value"] = True
+        ui.post_log("SUCCESS", "DEMO", "Demo backend started.")
 
         scans = [
             (
@@ -964,50 +923,32 @@ def _demo():
                 None,
                 "Student is inactive: Lim, Carlo B.",
             ),
-            (
-                True,
-                "11223344",
-                "TIME_IN",
-                "Time In recorded for Dela Torre, Ana R.",
-            ),
-            (
-                False,
-                "FFFF0001",
-                None,
-                "Database lookup failed for RFID UID: FFFF0001",
-            ),
-            (
-                True,
-                "AABBCCDD",
-                "TIME_IN",
-                "Time In recorded for Villanueva, Marco S.",
-            ),
         ]
 
-        for ok, uid, action, message in scans:
-            time.sleep(1.1)
-            ui.post_event(
-                success=ok,
-                text=message,
-                uid=uid,
-                action=action,
-            )
+        while demo_running["value"]:
+            for ok, uid, action, message in scans:
+                if not demo_running["value"]:
+                    break
 
-        time.sleep(0.9)
-        ui.post_log("WARN", "BUFFER", "RFID UID buffer insert latency > 200ms")
+                time.sleep(1.1)
 
-        time.sleep(0.4)
-        ui.post_log("INFO", "DB", "Connection pool: 2/10 active")
+                ui.post_event(
+                    success=ok,
+                    text=message,
+                    uid=uid,
+                    action=action,
+                )
 
-        time.sleep(0.4)
-        ui.post_log(
-            "ERROR",
-            "DB",
-            "Failed to save scan log. UID=CAFE1234, Error=timeout",
-        )
+        ui.post_log("SYSTEM", "DEMO", "Demo backend stopped.")
 
-    threading.Thread(target=_feed, daemon=True).start()
-    ui.launch()
+    def demo_backend_stop():
+        demo_running["value"] = False
+
+    ui.launch(
+        backend_start_fn=demo_backend_start,
+        backend_stop_fn=demo_backend_stop,
+        auto_start=False,
+    )
 
 
 if __name__ == "__main__":
