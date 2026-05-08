@@ -154,7 +154,7 @@ def main():
     ui.launch(
         backend_start_fn=backend.run,
         backend_stop_fn=backend.stop,
-        auto_start=False,
+        auto_start=True,
     )
 
 

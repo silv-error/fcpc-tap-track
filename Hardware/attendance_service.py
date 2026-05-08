@@ -145,8 +145,6 @@ class AttendanceService:
         if not person_data:
             message = f"RFID UID is not registered: {uid}"
 
-            logger.warning("No registered person found for UID: %s", uid)
-
             self.safe_log_rfid_scan(
                 rfid_uid=uid,
                 scan_result="FAILED",

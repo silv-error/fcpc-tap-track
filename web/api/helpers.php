@@ -1,12 +1,87 @@
 <?php
 
+// ── Python UI log notifier ────────────────────────────────────────────────────
+// Sends a fire-and-forget POST to the local Python HTTP log listener so that
+// every API response appears in the Tkinter HTTP Request Log panel.
+// If Python is not running the call silently fails (timeout = 100 ms).
+
+define('PYTHON_LOG_RECEIVER', 'http://127.0.0.1:5678/http-log');
+
+// Files that must never report themselves (would cause an infinite loop).
+define('LOG_EXCLUDED_SCRIPTS', ['http_log_receiver.php']);
+
+function _notify_python_ui(int $statusCode, array $payload): void
+{
+    // Use PHP_SELF (the actual script being executed) rather than REQUEST_URI
+    // (which includes the full subpath prefix like /rfid-attendance-system/web/).
+    $script = basename($_SERVER['PHP_SELF'] ?? $_SERVER['SCRIPT_FILENAME'] ?? '');
+    if (in_array($script, LOG_EXCLUDED_SCRIPTS, true)) {
+        return;
+    }
+
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+
+    // Use just the filename (e.g. students.php) so the log is clean regardless
+    // of how deep the XAMPP subfolder is. Append ?action= when present.
+    $action   = $_GET['action'] ?? $_POST['action'] ?? '';
+    $endpoint = $action !== '' ? "{$script}?action={$action}" : $script;
+
+    // Logged-in user from session (set by auth_check.php).
+    $userId   = $_SESSION['user_id']   ?? null;
+    $username = $_SESSION['username']  ?? null;
+
+    $userLabel = '-';
+    if ($userId !== null) {
+        $userLabel = $username !== null
+            ? "{$username} (ID: {$userId})"
+            : "ID: {$userId}";
+    }
+
+    // Build a short human-readable detail from the response payload.
+    $detail = '';
+    if (isset($payload['message'])) {
+        $detail = (string) $payload['message'];
+    } elseif (isset($payload['success'])) {
+        $detail = $payload['success'] ? 'OK' : 'Failed';
+    }
+
+    $body = json_encode([
+        'method'   => $method,
+        'endpoint' => $endpoint,
+        'status'   => $statusCode,
+        'user'     => $userLabel,
+        'detail'   => mb_substr($detail, 0, 120),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $ch = curl_init(PYTHON_LOG_RECEIVER);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $body,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT_MS     => 100,   // never slow down the real response
+        CURLOPT_CONNECTTIMEOUT_MS => 80,
+        CURLOPT_NOSIGNAL       => 1,     // required for sub-second timeouts
+    ]);
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+// ── Core response helper ──────────────────────────────────────────────────────
+
 function json_response(array $payload, int $statusCode = 200): never
 {
     http_response_code($statusCode);
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    // Notify Python UI — runs after the response body is queued, before exit.
+    _notify_python_ui($statusCode, $payload);
+
     exit;
 }
+
+// ── Name / display helpers ────────────────────────────────────────────────────
 
 function format_middle_initial(?string $middleName): string
 {
@@ -112,7 +187,6 @@ function fetch_all_rows(mysqli $con, string $sql): array
  * Executes a prepared statement and returns all rows as an associative array.
  *
  * @param mysqli  $con    Database connection
- * @param string  $sql    SQL query with ? placeholders
  * @param string  $types  bind_param type string (e.g. 'si', 'ss')
  * @param mixed   ...$params  Values to bind, in placeholder order
  */
