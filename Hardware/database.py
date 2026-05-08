@@ -627,12 +627,6 @@ class DatabaseManager:
         used_by_student_id = self.find_student_index_by_rfid_uid(normalized_uid)
         is_used = 1 if used_by_student_id is not None else 0
 
-        print("[RFID BUFFER DEBUG]")
-        print("Scanned UID:", normalized_uid)
-        print("Found student ID:", used_by_student_id)
-        print("Is used:", is_used)
-        print("Connected database:", self.database)
-
         connection = self.get_connection()
         cursor = None
 

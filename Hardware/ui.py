@@ -335,10 +335,16 @@ class AttendanceUI:
         self._build_status_bar()
         _Sep(self.root, color=C_BORDER)
 
-        # Main content area — RFID log on top, HTTP log on bottom
-        self._build_rfid_panel()
-        self._build_http_panel()
+        # Footer MUST be packed before the expanding panels.
+        # In tkinter pack, side="bottom" only reserves space if packed
+        # before any side="top" expand=True widgets consume everything.
         self._build_footer()
+        _Sep(self.root, color=C_BORDER)
+
+        # Main content area — RFID log on top (60%), HTTP log on bottom (40%)
+        self._build_rfid_panel()
+        _Sep(self.root, color=C_BORDER_HI)
+        self._build_http_panel()
 
     def _build_header(self):
         bar = tk.Frame(self.root, bg=C_SURFACE)
@@ -467,7 +473,7 @@ class AttendanceUI:
 
     def _build_rfid_panel(self):
         self._rfid_panel = tk.Frame(self.root, bg=C_BG)
-        self._rfid_panel.pack(fill="both", expand=True)
+        self._rfid_panel.pack(fill="both", expand=True)  # takes ~60% of remaining height
 
         self._build_rfid_log_header()
         _Sep(self._rfid_panel, color=C_BORDER)
@@ -589,10 +595,8 @@ class AttendanceUI:
     # ------------------------------------------------------------------ #
 
     def _build_http_panel(self):
-        _Sep(self.root, color=C_BORDER_HI)
-
         self._http_panel = tk.Frame(self.root, bg=C_BG)
-        self._http_panel.pack(fill="both", expand=True)
+        self._http_panel.pack(fill="both", expand=True)  # shares remaining space with rfid panel
 
         self._build_http_log_header()
         _Sep(self._http_panel, color=C_BORDER)
@@ -757,10 +761,10 @@ class AttendanceUI:
     # ------------------------------------------------------------------ #
 
     def _build_footer(self):
-        _Sep(self.root, color=C_BORDER)
-
-        bar = tk.Frame(self.root, bg=C_SURFACE, height=34)
-        bar.pack(fill="x")
+        # Pack with side="bottom" so the footer anchors to the bottom edge
+        # and is not consumed by the expand=True panels above it.
+        bar = tk.Frame(self.root, bg=C_SURFACE, height=42)
+        bar.pack(side="bottom", fill="x")
         bar.pack_propagate(False)
 
         self._autoscroll = tk.BooleanVar(value=True)
@@ -778,34 +782,57 @@ class AttendanceUI:
             bd=0,
             cursor="hand2",
         )
-        checkbox.pack(side="left", padx=14, pady=5)
+        checkbox.pack(side="left", padx=14, pady=7)
+
+        _VLine(bar, color=C_BORDER)
+
+        # Scanner status indicator label
+        self._scanner_status_dot = tk.Label(
+            bar,
+            text="●",
+            font=self.fnt_label,
+            bg=C_SURFACE,
+            fg=C_SLATE,
+        )
+        self._scanner_status_dot.pack(side="left", padx=(12, 4), pady=7)
+
+        self._scanner_status_var = tk.StringVar(value="SCANNER  ·  stopped")
+        tk.Label(
+            bar,
+            textvariable=self._scanner_status_var,
+            font=self.fnt_dim,
+            bg=C_SURFACE,
+            fg=C_TEXT_2,
+        ).pack(side="left", padx=(0, 12), pady=7)
+
+        _VLine(bar, color=C_BORDER)
 
         self._start_btn = tk.Button(
             bar,
-            text="START",
+            text="▶  START",
             font=self.fnt_badge,
-            bg=C_RAISED,
-            fg=C_GREEN,
+            bg=C_GREEN,
+            fg="#0e1015",
             bd=0,
-            padx=14,
-            pady=1,
-            activebackground=C_BORDER,
-            activeforeground=C_GREEN,
+            padx=16,
+            pady=4,
+            activebackground=C_TEAL,
+            activeforeground="#0e1015",
             cursor="hand2",
             relief="flat",
             command=self._start_backend_from_button,
         )
-        self._start_btn.pack(side="left", padx=(4, 6), pady=5)
+        self._start_btn.pack(side="left", padx=(4, 6), pady=7)
 
         self._stop_btn = tk.Button(
             bar,
-            text="STOP",
+            text="■  STOP",
             font=self.fnt_badge,
             bg=C_RAISED,
             fg=C_TEXT_3,
             bd=0,
-            padx=14,
-            pady=1,
+            padx=16,
+            pady=4,
             activebackground=C_BORDER,
             activeforeground=C_RED,
             cursor="hand2",
@@ -813,7 +840,7 @@ class AttendanceUI:
             command=self._stop_backend_from_button,
             state="disabled",
         )
-        self._stop_btn.pack(side="left", padx=(0, 10), pady=5)
+        self._stop_btn.pack(side="left", padx=(0, 10), pady=7)
 
         tk.Button(
             bar,
@@ -823,13 +850,13 @@ class AttendanceUI:
             fg=C_AMBER,
             bd=0,
             padx=12,
-            pady=1,
+            pady=4,
             activebackground=C_BORDER,
             activeforeground=C_AMBER,
             cursor="hand2",
             relief="flat",
             command=self._clear_all,
-        ).pack(side="right", padx=14, pady=5)
+        ).pack(side="right", padx=14, pady=7)
 
     # ------------------------------------------------------------------ #
     #  CLOCK & PUMP                                                        #
@@ -1105,11 +1132,17 @@ class AttendanceUI:
             return
 
         if running:
-            self._start_btn.configure(state="disabled", fg=C_TEXT_3)
-            self._stop_btn.configure(state="normal", fg=C_RED)
+            self._start_btn.configure(state="disabled", bg=C_RAISED, fg=C_TEXT_3)
+            self._stop_btn.configure(state="normal", bg=C_RED, fg="#0e1015")
+            if hasattr(self, "_scanner_status_dot"):
+                self._scanner_status_dot.configure(fg=C_GREEN)
+                self._scanner_status_var.set("SCANNER  ·  active")
         else:
-            self._start_btn.configure(state="normal", fg=C_GREEN)
-            self._stop_btn.configure(state="disabled", fg=C_TEXT_3)
+            self._start_btn.configure(state="normal", bg=C_GREEN, fg="#0e1015")
+            self._stop_btn.configure(state="disabled", bg=C_RAISED, fg=C_TEXT_3)
+            if hasattr(self, "_scanner_status_dot"):
+                self._scanner_status_dot.configure(fg=C_SLATE)
+                self._scanner_status_var.set("SCANNER  ·  stopped")
 
     def _start_backend_from_button(self):
         if self._backend_running:
