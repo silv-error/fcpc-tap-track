@@ -19,11 +19,10 @@ class AttendanceBackend:
 
         self.lock = threading.Lock()
 
-        # Use the DB config that the user entered in the dialog.
-        # get_db_config() returns the dict set by _DbConfigDialog; if for any
-        # reason it is None we fall back to config.load() inside DatabaseManager.
-        self.database_manager = DatabaseManager(db_config=ui.get_db_config())
-        self.attendance_service = AttendanceService(self.database_manager)
+        # database_manager and attendance_service are created fresh in run()
+        # so they always reflect the latest DB config (e.g. after ⚙ DB CONFIG).
+        self.database_manager: Optional[DatabaseManager] = None
+        self.attendance_service: Optional[AttendanceService] = None
 
         self.rfid_reader = RFIDReaderService(
             on_uid_callback=self.handle_uid,
@@ -145,6 +144,11 @@ class AttendanceBackend:
             self.stop_event.clear()
 
         try:
+            # Build fresh DB objects using the config that is current at the
+            # moment START is pressed — picks up any changes made via ⚙ DB CONFIG.
+            self.database_manager   = DatabaseManager(db_config=self.ui.get_db_config())
+            self.attendance_service = AttendanceService(self.database_manager)
+
             self.rfid_reader.start()
 
             self.safe_post_log(
