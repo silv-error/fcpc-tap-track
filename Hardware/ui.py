@@ -25,14 +25,9 @@ C_AMBER  = "#ffb347"
 C_RED    = "#ff5f5f"
 C_PURPLE = "#b48eff"
 
-# SYSTEM log entries: mid-brightness cyan-steel — clearly "informational",
-# not lost in the background like plain slate was
 C_SLATE  = "#6eb5c0"
 
 # ── Text hierarchy ────────────────────────────────────────────────────────────
-# TEXT_1  primary log content & headings          ~12:1 contrast on C_BG
-# TEXT_2  status bar labels, secondary chrome     ~6.5:1 contrast on C_BG
-# TEXT_3  column headers, clock, structural UI    teal-tinted, ~4.8:1 on C_BG
 C_TEXT_1 = "#e8edf8"
 C_TEXT_2 = "#a8bbd0"
 C_TEXT_3 = "#4e8fa0"
@@ -66,10 +61,6 @@ HTTP_METHOD_COLORS = {
     "DELETE": C_RED,
 }
 
-# ── Column headers (live inside the Text widgets for pixel-perfect alignment) ─
-#
-# RFID panel — UID & ACTION folded into MESSAGE prefix to remove h-scroll
-#   #     TIME      LVL  TAG         MESSAGE
 RFID_HEADER = (
     f"{'#':>4}  "
     f"{'TIME':<8}  "
@@ -78,8 +69,6 @@ RFID_HEADER = (
     f"MESSAGE\n"
 )
 
-# HTTP panel — USER folded into trailing detail; only essential fixed cols kept
-#   #     TIME      MTH   ST   LAT     ENDPOINT  ·  DETAIL
 HTTP_HEADER = (
     f"{'#':>4}  "
     f"{'TIME':<8}  "
@@ -269,6 +258,15 @@ class AttendanceUI:
         self.root.minsize(900, 580)
         self.root.configure(bg=C_BG)
 
+        # ── Maximize on startup (cross-platform) ──────────────────────────────
+        try:
+            self.root.state("zoomed")           # Windows & some Linux WMs
+        except tk.TclError:
+            try:
+                self.root.attributes("-zoomed", True)   # Linux/X11 fallback
+            except tk.TclError:
+                pass                            # macOS: falls back to geometry
+
         try:
             self.root.iconbitmap(default="")
         except Exception:
@@ -332,12 +330,9 @@ class AttendanceUI:
         self._build_status_bar()
         _Sep(self.root, color=C_BORDER)
 
-        # Footer anchored to bottom before the expanding pane consumes space
         self._build_footer()
         _Sep(self.root, color=C_BORDER)
 
-        # Horizontal PanedWindow — RFID left, HTTP right
-        # sashwidth=3 gives a subtle draggable divider
         self._paned = tk.PanedWindow(
             self.root,
             orient="horizontal",
@@ -503,7 +498,6 @@ class AttendanceUI:
             insertbackground=C_TEXT_1,
             font=self.fnt_log,
             bd=0, highlightthickness=0,
-            # word-wrap: long messages fold to next line — no h-scroll needed
             wrap="word",
             state="disabled",
             padx=12, pady=6,
@@ -659,7 +653,6 @@ class AttendanceUI:
         self._row_idx        += 1
         self._log_line_count += 1
 
-        # Fold UID & ACTION into the message prefix — avoids needing extra columns
         prefix = ""
         if uid:
             prefix += f"[{uid}]"
@@ -716,7 +709,6 @@ class AttendanceUI:
 
         lat_str = f"{latency_ms}ms" if latency_ms is not None else "—"
 
-        # Fold user into the detail column — fewer fixed-width columns needed
         detail_full = f"{user}  {detail}".strip() if user != "-" else detail
 
         line = (
