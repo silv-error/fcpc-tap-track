@@ -10,14 +10,14 @@ from typing import Optional, Set
 
 HTTP_LOG_LISTENER_PORT = 5678
 
-# ── Backgrounds ───────────────────────────────────────────────────────────────
+# Backgrounds
 C_BG        = "#0e1015"
 C_SURFACE   = "#14171f"
 C_RAISED    = "#1c2030"
 C_BORDER    = "#262c3e"
 C_BORDER_HI = "#3a4260"
 
-# ── Accent palette ────────────────────────────────────────────────────────────
+# Accent palette 
 C_TEAL   = "#00c9a7"
 C_BLUE   = "#4d9fff"
 C_GREEN  = "#3ddc84"
@@ -27,12 +27,12 @@ C_PURPLE = "#b48eff"
 
 C_SLATE  = "#6eb5c0"
 
-# ── Text hierarchy ────────────────────────────────────────────────────────────
+# Text hierarchy
 C_TEXT_1 = "#e8edf8"
 C_TEXT_2 = "#a8bbd0"
 C_TEXT_3 = "#4e8fa0"
 
-# ── Typography ────────────────────────────────────────────────────────────────
+# Typography
 F_MONO     = "Consolas"
 F_FALLBACK = "Courier New"
 
@@ -77,11 +77,6 @@ HTTP_HEADER = (
     f"{'LAT':<6}  "
     f"ENDPOINT  ·  DETAIL\n"
 )
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  SMALL HELPERS
-# ══════════════════════════════════════════════════════════════════════════════
 
 class _Sep(tk.Frame):
     def __init__(self, parent, color=C_BORDER, **kwargs):
@@ -133,11 +128,6 @@ class _PulseDot(tk.Canvas):
         self._color   = color
         self.itemconfig(self._dot, fill=color)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  READER WATCHER
-# ══════════════════════════════════════════════════════════════════════════════
-
 class _ReaderWatcher:
     POLL_MS = 800
 
@@ -187,11 +177,6 @@ class _ReaderWatcher:
                 self._known.clear()
             self._stop.wait(self.POLL_MS / 1000)
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  HTTP LOG LISTENER
-# ══════════════════════════════════════════════════════════════════════════════
-
 class _HttpLogListener:
     """Receives POST /http-log JSON payloads from PHP via cURL."""
 
@@ -234,11 +219,6 @@ class _HttpLogListener:
         if self._server:
             self._server.shutdown()
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  MAIN UI
-# ══════════════════════════════════════════════════════════════════════════════
-
 class AttendanceUI:
     def __init__(self):
         self._q: queue.Queue = queue.Queue()
@@ -258,7 +238,7 @@ class AttendanceUI:
         self.root.minsize(900, 580)
         self.root.configure(bg=C_BG)
 
-        # ── Maximize on startup (cross-platform) ──────────────────────────────
+        # Maximize on startup (cross-platform)
         try:
             self.root.state("zoomed")           # Windows & some Linux WMs
         except tk.TclError:
@@ -290,7 +270,7 @@ class AttendanceUI:
         )
         self._http_listener.start()
 
-    # ── queue helper ──────────────────────────────────────────────────────────
+    # queue helper
 
     def _on_php_http_log(self, data: dict):
         self._q.put({
@@ -304,7 +284,7 @@ class AttendanceUI:
             "detail":     data.get("detail", ""),
         })
 
-    # ── fonts ─────────────────────────────────────────────────────────────────
+    # fonts 
 
     def _build_fonts(self):
         def mf(size, bold=False):
@@ -322,7 +302,7 @@ class AttendanceUI:
         self.fnt_clock = mf(SZ_CLOCK)
         self.fnt_dim   = mf(SZ_LABEL)
 
-    # ── top-level layout ──────────────────────────────────────────────────────
+    # top-level layout
 
     def _build_ui(self):
         self._build_header()
@@ -346,7 +326,7 @@ class AttendanceUI:
         self._build_rfid_panel()
         self._build_http_panel()
 
-    # ── header ────────────────────────────────────────────────────────────────
+    # header 
 
     def _build_header(self):
         bar = tk.Frame(self.root, bg=C_SURFACE)
@@ -370,7 +350,7 @@ class AttendanceUI:
                  bg=C_SURFACE, fg=C_TEXT_3).pack()
         self._tick_clock()
 
-    # ── status bar ────────────────────────────────────────────────────────────
+    # status bar
 
     def _build_status_bar(self):
         bar = tk.Frame(self.root, bg=C_SURFACE, height=36)
@@ -412,7 +392,7 @@ class AttendanceUI:
         tk.Label(right, text="entries  ", font=self.fnt_dim,
                  bg=C_SURFACE, fg=C_TEXT_3).pack(side="right")
 
-    # ── footer ────────────────────────────────────────────────────────────────
+    # footer 
 
     def _build_footer(self):
         bar = tk.Frame(self.root, bg=C_SURFACE, height=40)
@@ -465,7 +445,7 @@ class AttendanceUI:
             command=self._clear_all,
         ).pack(side="right", padx=14, pady=6)
 
-    # ── RFID panel (left pane) ────────────────────────────────────────────────
+    # RFID panel (left pane) 
 
     def _build_rfid_panel(self):
         self._rfid_panel = tk.Frame(self._paned, bg=C_BG)
@@ -525,7 +505,7 @@ class AttendanceUI:
         self._log_text.insert("1.0", RFID_HEADER, "HEADER")
         self._log_text.configure(state="disabled")
 
-    # ── HTTP panel (right pane) ───────────────────────────────────────────────
+    # HTTP panel (right pane)
 
     def _build_http_panel(self):
         self._http_panel = tk.Frame(self._paned, bg=C_BG)
@@ -609,7 +589,7 @@ class AttendanceUI:
         self._http_text.insert("1.0", HTTP_HEADER, "HEADER")
         self._http_text.configure(state="disabled")
 
-    # ── clock & event pump ────────────────────────────────────────────────────
+    # clock & event pump
 
     def _tick_clock(self):
         self._clock_var.set(datetime.now().strftime("%Y-%m-%d   %H:%M:%S"))
@@ -638,7 +618,7 @@ class AttendanceUI:
         elif kind == "backend_buttons":
             self._apply_backend_buttons(msg.get("running", False))
 
-    # ── RFID log append ───────────────────────────────────────────────────────
+    # RFID log append
 
     def _append(self, msg: dict):
         level  = msg.get("level", "INFO")
@@ -682,7 +662,7 @@ class AttendanceUI:
         if self._autoscroll.get():
             self._log_text.see("end")
 
-    # ── HTTP log append ───────────────────────────────────────────────────────
+    # HTTP log append
 
     def _append_http(self, msg: dict):
         ts         = msg.get("timestamp", "")
@@ -739,7 +719,7 @@ class AttendanceUI:
         if self._autoscroll.get():
             self._http_text.see("end")
 
-    # ── status updates ────────────────────────────────────────────────────────
+    # status updates
 
     def _update_scan_status(self, msg: dict):
         success = msg.get("success", True)
@@ -786,7 +766,7 @@ class AttendanceUI:
                      "text": "pyscard not installed — install with: pip install pyscard",
                      "uid": "", "action": "", "timestamp": ts})
 
-    # ── clear ─────────────────────────────────────────────────────────────────
+    # clear 
 
     def _clear_rfid(self):
         self._log_text.configure(state="normal")
@@ -813,7 +793,7 @@ class AttendanceUI:
         self._clear_rfid()
         self._clear_http()
 
-    # ── backend button state ──────────────────────────────────────────────────
+    # backend button state
 
     def _queue_backend_button_state(self, running: bool):
         self._q.put({"kind": "backend_buttons", "running": running})
@@ -867,7 +847,7 @@ class AttendanceUI:
             self._apply_backend_buttons(False)
             self.post_system("Backend stop requested.")
 
-    # ── public API — RFID / system logging ───────────────────────────────────
+    # public API — RFID / system logging 
 
     def post_event(self, *, success: bool, text: str,
                    uid: str = "", action: Optional[str] = None):
@@ -899,7 +879,7 @@ class AttendanceUI:
                      "text": text, "uid": uid, "action": action or "",
                      "timestamp": datetime.now().strftime("%H:%M:%S")})
 
-    # ── public API — HTTP request logging ────────────────────────────────────
+    # public API — HTTP request logging
 
     def post_http(self, method: str, endpoint: str, status: int = 0,
                   latency_ms: Optional[int] = None,
@@ -910,7 +890,7 @@ class AttendanceUI:
                      "latency_ms": latency_ms, "user": user,
                      "endpoint": endpoint, "detail": detail})
 
-    # ── backend thread runner ─────────────────────────────────────────────────
+    # backend thread runner
 
     def _run_backend_safely(self, backend_start_fn):
         try:
@@ -924,7 +904,7 @@ class AttendanceUI:
             self._queue_backend_button_state(False)
             self.post_system("Backend thread stopped.")
 
-    # ── launch ────────────────────────────────────────────────────────────────
+    # launch 
 
     def launch(self, backend_start_fn=None, backend_stop_fn=None, auto_start=False):
         self._backend_start_fn = backend_start_fn
@@ -959,12 +939,7 @@ class AttendanceUI:
             except Exception:
                 pass
 
-
-# ══════════════════════════════════════════════════════════════════════════════
-#  DEMO
-# ══════════════════════════════════════════════════════════════════════════════
-
-def _demo():
+def main():
     import time
     import random
 
@@ -985,7 +960,7 @@ def _demo():
             (False, "BADA5510", None,        "Student is inactive: Lim, Carlo B."),
         ]
 
-        http_samples = [
+        http_endpoints = [
             ("POST", "/api/attendance.php", 200, "action=time_in — 1 row inserted"),
             ("POST", "/api/attendance.php", 200, "action=time_out — record updated"),
             ("GET",  "/api/students.php",   200, "action=validate-rfid — found"),
@@ -1005,7 +980,7 @@ def _demo():
                 break
             ui.post_event(success=ok, text=message, uid=uid, action=action)
             for _ in range(random.randint(1, 2)):
-                m, ep, st, det = http_samples[http_idx % len(http_samples)]
+                m, ep, st, det = http_endpoints[http_idx % len(http_endpoints)]
                 http_idx += 1
                 ui.post_http(
                     method=m, endpoint=ep, status=st,
@@ -1027,4 +1002,4 @@ def _demo():
 
 
 if __name__ == "__main__":
-    _demo()
+    main()
