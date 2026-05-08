@@ -1,0 +1,7 @@
+{
+  "host": "localhost",
+  "user": "root",
+  "password": "",
+  "database": "rfid_attendance",
+  "port": 3306
+}

@@ -19,7 +19,10 @@ class AttendanceBackend:
 
         self.lock = threading.Lock()
 
-        self.database_manager = DatabaseManager()
+        # Use the DB config that the user entered in the dialog.
+        # get_db_config() returns the dict set by _DbConfigDialog; if for any
+        # reason it is None we fall back to config.load() inside DatabaseManager.
+        self.database_manager = DatabaseManager(db_config=ui.get_db_config())
         self.attendance_service = AttendanceService(self.database_manager)
 
         self.rfid_reader = RFIDReaderService(
@@ -196,11 +199,23 @@ class AttendanceBackend:
 
 def main():
     ui = AttendanceUI()
-    backend = AttendanceBackend(ui=ui)
+
+    # The backend is created inside the start callback so it picks up the
+    # DB config that was entered in the dialog (which runs before auto_start).
+    _backend: Optional[AttendanceBackend] = None
+
+    def _start():
+        nonlocal _backend
+        _backend = AttendanceBackend(ui=ui)
+        _backend.run()
+
+    def _stop():
+        if _backend:
+            _backend.stop()
 
     ui.launch(
-        backend_start_fn=backend.run,
-        backend_stop_fn=backend.stop,
+        backend_start_fn=_start,
+        backend_stop_fn=_stop,
         auto_start=True,
     )
 
