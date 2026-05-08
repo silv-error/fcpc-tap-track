@@ -8,6 +8,8 @@ from tkinter import font as tkfont
 from datetime import datetime
 from typing import Optional, Set
 
+import config
+
 HTTP_LOG_LISTENER_PORT = 5678
 
 # ── Backgrounds ───────────────────────────────────────────────────────────────
@@ -25,14 +27,10 @@ C_AMBER  = "#ffb347"
 C_RED    = "#ff5f5f"
 C_PURPLE = "#b48eff"
 
-# SYSTEM log entries: mid-brightness cyan-steel — clearly "informational",
-# not lost in the background like plain slate was
+# SYSTEM log entries: mid-brightness cyan-steel
 C_SLATE  = "#6eb5c0"
 
 # ── Text hierarchy ────────────────────────────────────────────────────────────
-# TEXT_1  primary log content & headings          ~12:1 contrast on C_BG
-# TEXT_2  status bar labels, secondary chrome     ~6.5:1 contrast on C_BG
-# TEXT_3  column headers, clock, structural UI    teal-tinted, ~4.8:1 on C_BG
 C_TEXT_1 = "#e8edf8"
 C_TEXT_2 = "#a8bbd0"
 C_TEXT_3 = "#4e8fa0"
@@ -66,10 +64,7 @@ HTTP_METHOD_COLORS = {
     "DELETE": C_RED,
 }
 
-# ── Column headers (live inside the Text widgets for pixel-perfect alignment) ─
-#
-# RFID panel — UID & ACTION folded into MESSAGE prefix to remove h-scroll
-#   #     TIME      LVL  TAG         MESSAGE
+# ── Column headers ─────────────────────────────────────────────────────────────
 RFID_HEADER = (
     f"{'#':>4}  "
     f"{'TIME':<8}  "
@@ -78,8 +73,6 @@ RFID_HEADER = (
     f"MESSAGE\n"
 )
 
-# HTTP panel — USER folded into trailing detail; only essential fixed cols kept
-#   #     TIME      MTH   ST   LAT     ENDPOINT  ·  DETAIL
 HTTP_HEADER = (
     f"{'#':>4}  "
     f"{'TIME':<8}  "
@@ -143,6 +136,215 @@ class _PulseDot(tk.Canvas):
         self._pulsing = False
         self._color   = color
         self.itemconfig(self._dot, fill=color)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  DB CONFIG DIALOG
+# ══════════════════════════════════════════════════════════════════════════════
+
+class _DbConfigDialog(tk.Toplevel):
+    """
+    Modal dialog shown before the main log view.
+
+    On successful connection the values are:
+      • saved to db_config.json (via config.save)
+      • returned through self.result as a dict
+    """
+
+    def __init__(self, parent, on_connect):
+        super().__init__(parent)
+        self.title("Database Configuration")
+        self.configure(bg=C_BG)
+        self.resizable(False, False)
+        self.grab_set()           # modal
+        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
+
+        self._on_connect  = on_connect
+        self.result: Optional[dict] = None
+
+        # pre-fill from persisted / default values
+        cfg = config.load()
+
+        self._build_fonts()
+        self._build_ui(cfg)
+
+        # centre over parent
+        self.update_idletasks()
+        pw = parent.winfo_width()
+        ph = parent.winfo_height()
+        px = parent.winfo_x()
+        py = parent.winfo_y()
+        dw = self.winfo_width()
+        dh = self.winfo_height()
+        self.geometry(f"+{px + (pw - dw)//2}+{py + (ph - dh)//2}")
+
+    # ── fonts ─────────────────────────────────────────────────────────────────
+
+    def _build_fonts(self):
+        def mf(size, bold=False):
+            w = "bold" if bold else "normal"
+            try:
+                return tkfont.Font(family=F_MONO, size=size, weight=w)
+            except Exception:
+                return tkfont.Font(family=F_FALLBACK, size=size, weight=w)
+
+        self.fnt_title  = mf(SZ_TITLE, bold=True)
+        self.fnt_label  = mf(SZ_LABEL, bold=True)
+        self.fnt_input  = mf(SZ_LOG)
+        self.fnt_badge  = mf(SZ_BADGE, bold=True)
+        self.fnt_status = mf(SZ_LABEL)
+
+    # ── UI ────────────────────────────────────────────────────────────────────
+
+    def _build_ui(self, cfg: dict):
+        # ── title bar ────────────────────────────────────────────────────────
+        title_bar = tk.Frame(self, bg=C_SURFACE)
+        title_bar.pack(fill="x")
+
+        tk.Label(title_bar, text="▪", font=self.fnt_label,
+                 bg=C_SURFACE, fg=C_TEAL).pack(side="left", padx=(18, 6), pady=12)
+        tk.Label(title_bar, text="DATABASE CONFIGURATION", font=self.fnt_title,
+                 bg=C_SURFACE, fg=C_TEXT_1).pack(side="left", pady=12)
+
+        _Sep(self, color=C_BORDER_HI)
+
+        # ── form ─────────────────────────────────────────────────────────────
+        form = tk.Frame(self, bg=C_BG, padx=28, pady=20)
+        form.pack(fill="both", expand=True)
+
+        def _row(label: str, row: int, show: str = ""):
+            tk.Label(form, text=label, font=self.fnt_label,
+                     bg=C_BG, fg=C_TEXT_3, anchor="w",
+                     width=12).grid(row=row, column=0, sticky="w", pady=5)
+            var = tk.StringVar()
+            ent = tk.Entry(
+                form, textvariable=var, font=self.fnt_input,
+                bg=C_RAISED, fg=C_TEXT_1, insertbackground=C_TEXT_1,
+                bd=0, highlightthickness=1,
+                highlightbackground=C_BORDER, highlightcolor=C_TEAL,
+                relief="flat", width=30, show=show,
+            )
+            ent.grid(row=row, column=1, sticky="ew", padx=(10, 0), pady=5)
+            return var, ent
+
+        self._host_var, self._host_ent     = _row("Host",     0)
+        self._user_var, _                  = _row("User",     1)
+        self._pass_var, _                  = _row("Password", 2, show="●")
+        self._db_var,   _                  = _row("Database", 3)
+        self._port_var, _                  = _row("Port",     4)
+
+        form.columnconfigure(1, weight=1)
+
+        # pre-fill
+        self._host_var.set(cfg.get("host",     "localhost"))
+        self._user_var.set(cfg.get("user",     "root"))
+        self._pass_var.set(cfg.get("password", ""))
+        self._db_var.set(  cfg.get("database", "rfid_attendance"))
+        self._port_var.set(str(cfg.get("port", 3306)))
+
+        # ── status label ──────────────────────────────────────────────────────
+        self._status_var = tk.StringVar(value="")
+        self._status_lbl = tk.Label(
+            form, textvariable=self._status_var,
+            font=self.fnt_status, bg=C_BG, fg=C_AMBER,
+            anchor="w", wraplength=340,
+        )
+        self._status_lbl.grid(row=5, column=0, columnspan=2, sticky="w", pady=(8, 0))
+
+        _Sep(self, color=C_BORDER)
+
+        # ── buttons ───────────────────────────────────────────────────────────
+        btn_bar = tk.Frame(self, bg=C_SURFACE, padx=18, pady=10)
+        btn_bar.pack(fill="x")
+
+        self._connect_btn = tk.Button(
+            btn_bar, text="▶  CONNECT", font=self.fnt_badge,
+            bg=C_GREEN, fg="#0e1015", bd=0, padx=16, pady=4,
+            activebackground=C_TEAL, activeforeground="#0e1015",
+            cursor="hand2", relief="flat",
+            command=self._attempt_connect,
+        )
+        self._connect_btn.pack(side="left", padx=(0, 8))
+
+        tk.Button(
+            btn_bar, text="CANCEL", font=self.fnt_badge,
+            bg=C_RAISED, fg=C_TEXT_3, bd=0, padx=12, pady=4,
+            activebackground=C_BORDER, activeforeground=C_RED,
+            cursor="hand2", relief="flat",
+            command=self._on_cancel,
+        ).pack(side="left")
+
+        # focus the first field
+        self._host_ent.focus_set()
+        self.bind("<Return>", lambda _e: self._attempt_connect())
+
+    # ── connection attempt ────────────────────────────────────────────────────
+
+    def _attempt_connect(self):
+        host     = self._host_var.get().strip()
+        user     = self._user_var.get().strip()
+        password = self._pass_var.get()
+        database = self._db_var.get().strip()
+        port_str = self._port_var.get().strip()
+
+        if not all([host, user, database, port_str]):
+            self._set_status("Please fill in all required fields.", C_AMBER)
+            return
+
+        try:
+            port = int(port_str)
+            if not (1 <= port <= 65535):
+                raise ValueError
+        except ValueError:
+            self._set_status("Port must be a valid number (1–65535).", C_AMBER)
+            return
+
+        self._set_status("Connecting…", C_SLATE)
+        self._connect_btn.configure(state="disabled")
+        self.update()
+
+        db_cfg = {
+            "host": host, "user": user, "password": password,
+            "database": database, "port": port,
+        }
+
+        def _worker():
+            try:
+                # lightweight import — only the connector is needed here
+                import mysql.connector
+                conn = mysql.connector.connect(
+                    host=host, user=user, password=password,
+                    database=database, port=port,
+                    connect_timeout=5,
+                )
+                conn.close()
+                self.after(0, lambda: self._on_success(db_cfg))
+            except Exception as exc:
+                msg = str(exc)
+                self.after(0, lambda: self._on_failure(msg))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _on_success(self, db_cfg: dict):
+        config.save(**db_cfg)
+        self.result = db_cfg
+        self._on_connect(db_cfg)
+        self.grab_release()
+        self.destroy()
+
+    def _on_failure(self, message: str):
+        self._set_status(f"Connection failed: {message}", C_RED)
+        self._connect_btn.configure(state="normal")
+
+    def _set_status(self, text: str, color: str):
+        self._status_var.set(text)
+        self._status_lbl.configure(fg=color)
+
+    def _on_cancel(self):
+        # Closing the dialog without connecting exits the whole application.
+        self.grab_release()
+        self.destroy()
+        self.master.destroy()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -263,11 +465,14 @@ class AttendanceUI:
         self._backend_stop_fn  = None
         self._backend_running  = False
 
+        # DB config resolved after the dialog succeeds
+        self._db_config: Optional[dict] = None
+
         self.root = tk.Tk()
         self.root.title("RFID Attendance — Debug Monitor")
-        self.root.geometry("1200x780")
         self.root.minsize(900, 580)
         self.root.configure(bg=C_BG)
+        self.root.state("zoomed")   # maximized on Windows; falls back gracefully on other OS
 
         try:
             self.root.iconbitmap(default="")
@@ -332,12 +537,9 @@ class AttendanceUI:
         self._build_status_bar()
         _Sep(self.root, color=C_BORDER)
 
-        # Footer anchored to bottom before the expanding pane consumes space
         self._build_footer()
         _Sep(self.root, color=C_BORDER)
 
-        # Horizontal PanedWindow — RFID left, HTTP right
-        # sashwidth=3 gives a subtle draggable divider
         self._paned = tk.PanedWindow(
             self.root,
             orient="horizontal",
@@ -370,9 +572,19 @@ class AttendanceUI:
         right = tk.Frame(bar, bg=C_SURFACE)
         right.pack(side="right", padx=18, pady=10)
 
+        # ── DB config button in header ─────────────────────────────────────
+        self._db_btn = tk.Button(
+            right, text="⚙  DB CONFIG", font=self.fnt_badge,
+            bg=C_RAISED, fg=C_TEXT_2, bd=0, padx=10, pady=3,
+            activebackground=C_BORDER, activeforeground=C_TEAL,
+            cursor="hand2", relief="flat",
+            command=self._open_db_config_dialog,
+        )
+        self._db_btn.pack(side="right", padx=(10, 0))
+
         self._clock_var = tk.StringVar()
         tk.Label(right, textvariable=self._clock_var, font=self.fnt_clock,
-                 bg=C_SURFACE, fg=C_TEXT_3).pack()
+                 bg=C_SURFACE, fg=C_TEXT_3).pack(side="right")
         self._tick_clock()
 
     # ── status bar ────────────────────────────────────────────────────────────
@@ -406,6 +618,20 @@ class AttendanceUI:
 
         self._scan_var = tk.StringVar(value="awaiting first tap")
         tk.Label(mid, textvariable=self._scan_var, font=self.fnt_dim,
+                 bg=C_SURFACE, fg=C_TEXT_2).pack(side="left")
+
+        # ── DB connection indicator ────────────────────────────────────────
+        _VLine(bar, color=C_BORDER)
+
+        db_frame = tk.Frame(bar, bg=C_SURFACE)
+        db_frame.pack(side="left", fill="y", padx=18)
+
+        self._db_dot = tk.Label(db_frame, text="●", font=self.fnt_label,
+                                bg=C_SURFACE, fg=C_AMBER)
+        self._db_dot.pack(side="left", padx=(0, 5), pady=8)
+
+        self._db_status_var = tk.StringVar(value="DB  ·  not configured")
+        tk.Label(db_frame, textvariable=self._db_status_var, font=self.fnt_dim,
                  bg=C_SURFACE, fg=C_TEXT_2).pack(side="left")
 
         right = tk.Frame(bar, bg=C_SURFACE)
@@ -503,7 +729,6 @@ class AttendanceUI:
             insertbackground=C_TEXT_1,
             font=self.fnt_log,
             bd=0, highlightthickness=0,
-            # word-wrap: long messages fold to next line — no h-scroll needed
             wrap="word",
             state="disabled",
             padx=12, pady=6,
@@ -526,6 +751,7 @@ class AttendanceUI:
         self._log_text.tag_configure("WARN",    foreground=C_AMBER)
         self._log_text.tag_configure("INFO",    foreground=C_BLUE)
         self._log_text.tag_configure("SYSTEM",  foreground=C_SLATE)
+        self._log_text.tag_configure("DB_CFG",  foreground=C_TEAL)
 
         self._log_text.configure(state="normal")
         self._log_text.insert("1.0", RFID_HEADER, "HEADER")
@@ -615,6 +841,50 @@ class AttendanceUI:
         self._http_text.insert("1.0", HTTP_HEADER, "HEADER")
         self._http_text.configure(state="disabled")
 
+    # ── DB config dialog ──────────────────────────────────────────────────────
+
+    def _open_db_config_dialog(self):
+        """Open the DB config dialog on demand (e.g. to change the server)."""
+        self._show_db_dialog()
+
+    def _apply_db_config(self, db_cfg: dict):
+        """Called by the dialog on a successful connection."""
+        self._db_config = db_cfg
+        self._update_db_indicator(connected=True, cfg=db_cfg)
+        self._log_db_config(db_cfg)
+
+        # Notify any waiting backend launch
+        if hasattr(self, "_db_config_event"):
+            self._db_config_event.set()
+
+    def _update_db_indicator(self, connected: bool, cfg: Optional[dict] = None):
+        if connected and cfg:
+            label = f"DB  ·  {cfg['user']}@{cfg['host']}:{cfg['port']}/{cfg['database']}"
+            self._db_dot.configure(fg=C_GREEN)
+        else:
+            label = "DB  ·  not configured"
+            self._db_dot.configure(fg=C_AMBER)
+        self._db_status_var.set(label[:70])
+
+    def _log_db_config(self, cfg: dict):
+        """Emit the active DB settings as a block of SYSTEM log lines."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        lines = [
+            "━━━  DATABASE CONFIGURATION  ━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"  Host     : {cfg['host']}",
+            f"  Port     : {cfg['port']}",
+            f"  User     : {cfg['user']}",
+            f"  Database : {cfg['database']}",
+            f"  Password : {'*' * len(cfg['password']) if cfg['password'] else '(empty)'}",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        for line in lines:
+            self._q.put({
+                "kind": "row", "level": "SYSTEM", "tag": "DB_CFG",
+                "text": line, "uid": "", "action": "", "timestamp": ts,
+                "_color_tag": "DB_CFG",
+            })
+
     # ── clock & event pump ────────────────────────────────────────────────────
 
     def _tick_clock(self):
@@ -647,19 +917,19 @@ class AttendanceUI:
     # ── RFID log append ───────────────────────────────────────────────────────
 
     def _append(self, msg: dict):
-        level  = msg.get("level", "INFO")
-        tag    = msg.get("tag", "")
-        text   = msg.get("text", "")
-        ts     = msg.get("timestamp", "")
-        uid    = msg.get("uid", "")
-        action = msg.get("action", "")
+        level      = msg.get("level", "INFO")
+        tag        = msg.get("tag", "")
+        text       = msg.get("text", "")
+        ts         = msg.get("timestamp", "")
+        uid        = msg.get("uid", "")
+        action     = msg.get("action", "")
+        color_tag  = msg.get("_color_tag", level)   # allow override for DB_CFG
 
         _, abbrev = LEVEL_META.get(level, (C_SLATE, "???"))
 
         self._row_idx        += 1
         self._log_line_count += 1
 
-        # Fold UID & ACTION into the message prefix — avoids needing extra columns
         prefix = ""
         if uid:
             prefix += f"[{uid}]"
@@ -677,7 +947,7 @@ class AttendanceUI:
         )
 
         self._log_text.configure(state="normal")
-        self._log_text.insert("end", line, level)
+        self._log_text.insert("end", line, color_tag)
 
         if self._log_line_count > MAX_ROWS:
             self._log_text.delete("2.0", "3.0")
@@ -716,7 +986,6 @@ class AttendanceUI:
 
         lat_str = f"{latency_ms}ms" if latency_ms is not None else "—"
 
-        # Fold user into the detail column — fewer fixed-width columns needed
         detail_full = f"{user}  {detail}".strip() if user != "-" else detail
 
         line = (
@@ -814,9 +1083,6 @@ class AttendanceUI:
         self._http_status_dot.configure(fg=C_TEXT_3)
         self._http_status_var.set("idle")
 
-    def _clear(self):
-        self._clear_rfid()
-
     def _clear_all(self):
         self._clear_rfid()
         self._clear_http()
@@ -846,6 +1112,10 @@ class AttendanceUI:
     def _start_backend_from_button(self):
         if self._backend_running:
             self.post_log("WARN", "BACKEND", "Backend is already running.")
+            return
+        if not self._db_config:
+            self.post_log("WARN", "BACKEND",
+                          "No database configured. Use ⚙ DB CONFIG first.")
             return
         if not self._backend_start_fn:
             self.post_log("ERROR", "BACKEND", "No backend start function was provided.")
@@ -932,14 +1202,30 @@ class AttendanceUI:
             self._queue_backend_button_state(False)
             self.post_system("Backend thread stopped.")
 
+    # ── public accessor: resolved DB config ───────────────────────────────────
+
+    def get_db_config(self) -> Optional[dict]:
+        """Return the DB config set by the dialog, or None if not yet configured."""
+        return self._db_config
+
     # ── launch ────────────────────────────────────────────────────────────────
 
     def launch(self, backend_start_fn=None, backend_stop_fn=None, auto_start=False):
         self._backend_start_fn = backend_start_fn
         self._backend_stop_fn  = backend_stop_fn
+        self._auto_start       = auto_start
         self._apply_backend_buttons(False)
-        if auto_start and backend_start_fn:
-            self._start_backend_from_button()
+
+        # ── first launch vs. returning user ───────────────────────────────
+        # If db_config.json already exists we silently reconnect in the
+        # background and go straight to the log view.  The dialog only
+        # appears automatically on the very first run (no saved config).
+        # The user can always open it manually via ⚙ DB CONFIG.
+        if config.is_configured():
+            self.root.after(100, self._silent_connect)
+        else:
+            self.root.after(100, self._show_db_dialog)
+
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         try:
             self.root.mainloop()
@@ -951,6 +1237,60 @@ class AttendanceUI:
             except Exception:
                 pass
             self._on_close()
+
+    def _show_db_dialog(self):
+        """Open the config dialog (first run or manually triggered)."""
+        _DbConfigDialog(parent=self.root, on_connect=self._on_dialog_connect)
+
+    def _silent_connect(self):
+        """
+        Re-use the saved config without showing the dialog.
+        Runs the actual TCP connect in a thread so the UI stays responsive.
+        If the connection fails, fall back to showing the dialog.
+        """
+        cfg = config.load()
+        self._update_db_indicator(connected=False)   # amber while connecting
+        self._db_status_var.set("DB  ·  connecting…")
+
+        def _worker():
+            try:
+                import mysql.connector
+                conn = mysql.connector.connect(
+                    host=cfg["host"],
+                    user=cfg["user"],
+                    password=cfg["password"],
+                    database=cfg["database"],
+                    port=cfg["port"],
+                    connect_timeout=5,
+                )
+                conn.close()
+                self.root.after(0, lambda: self._on_silent_success(cfg))
+            except Exception as exc:
+                self.root.after(0, lambda: self._on_silent_failure(cfg, str(exc)))
+
+        threading.Thread(target=_worker, daemon=True, name="SilentConnect").start()
+
+    def _on_silent_success(self, cfg: dict):
+        """Saved config connected fine — proceed as normal."""
+        self._apply_db_config(cfg)
+        if self._auto_start and self._backend_start_fn:
+            self._start_backend_from_button()
+
+    def _on_silent_failure(self, cfg: dict, error_msg: str):
+        """Saved config failed — log a warning and open the dialog so the
+        user can correct the settings (e.g. host changed, new password)."""
+        self.post_log(
+            "WARN", "DB_CFG",
+            f"Auto-connect failed ({cfg['host']}:{cfg['port']}): {error_msg}",
+        )
+        self.post_log("WARN", "DB_CFG", "Opening configuration dialog…")
+        self._show_db_dialog()
+
+    def _on_dialog_connect(self, db_cfg: dict):
+        """Called when the dialog (first-run or manual) succeeds."""
+        self._apply_db_config(db_cfg)
+        if getattr(self, "_auto_start", False) and self._backend_start_fn:
+            self._start_backend_from_button()
 
     def _on_close(self):
         for fn in (
