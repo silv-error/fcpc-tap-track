@@ -1547,6 +1547,19 @@ body {
   color: #ffffff;
 }
 
+.app-toast.info {
+  background: #1a237e; /* blue info */
+  color: #ffffff;
+}
+
+/* stronger specificity while shown to avoid accidental overrides */
+.app-toast.show.info,
+.app-toast.info.show {
+  background: #1a237e !important;
+  color: #ffffff !important;
+  box-shadow: 0 6px 18px rgba(25,118,210,0.18);
+}
+
 .table-toolbar {
   display: flex;
   justify-content: space-between;
