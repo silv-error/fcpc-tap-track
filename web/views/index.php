@@ -9,7 +9,7 @@ if (!empty($_SESSION['user_id'])) {
   exit;
 }
 
-require_once __DIR__ . '/../api/csrf.php';
+require_once __DIR__ . '/../controllers/csrf.php';
 ?>
 
 <!DOCTYPE html>

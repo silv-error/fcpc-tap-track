@@ -8,7 +8,7 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
-require_once __DIR__ . '/../api/csrf.php';
+require_once __DIR__ . '/../controllers/csrf.php';
 ?>
 
 <!DOCTYPE html>
@@ -167,7 +167,7 @@ require_once __DIR__ . '/../api/csrf.php';
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table" data-endpoint="../api/students.php" data-table-type="students">
+        <table class="data-table" data-endpoint="../controllers/students.php" data-table-type="students">
           <thead>
             <tr>
               <th>Student No.</th>
