@@ -960,7 +960,7 @@ async function handleLogin(e) {
   if (btn) { btn.disabled = true; btn.textContent = 'Logging in…'; }
 
   try {
-    const res  = await fetch('login.php', {
+    const res  = await fetch('../controllers/login.php', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body:    JSON.stringify({ email, password }),
@@ -1043,11 +1043,11 @@ function handleLogout() {
 
   const confirmHandler = async () => {
     try {
-      await fetch('logout.php', { method: 'POST', headers: { 'X-CSRF-Token': getCsrfToken(), 'Accept': 'application/json' } });
+      await fetch('../controllers/logout.php', { method: 'POST', headers: { 'X-CSRF-Token': getCsrfToken(), 'Accept': 'application/json' } });
     } catch (e) {
       console.warn('Logout request failed:', e);
     } finally {
-      navigateWithTransition('index.php');
+      navigateWithTransition('login.php');
     }
   };
 
