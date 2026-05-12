@@ -238,8 +238,13 @@ function parseNameParts(record) {
 }
 
 function showToast(message, type = 'success') {
-  const toast = document.getElementById('appToast');
-  if (!toast) { alert(message); return; }
+  let toast = document.getElementById('appToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'appToast';
+    toast.className = 'app-toast';
+    document.body.appendChild(toast);
+  }
   toast.textContent = message;
   toast.className = `app-toast show ${type}`;
   window.clearTimeout(showToast._timer);

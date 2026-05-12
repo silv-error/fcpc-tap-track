@@ -4,16 +4,27 @@ from typing import Dict, List, Optional
 import mysql.connector
 from mysql.connector import Error
 
-from config import MYSQL_DATABASE, MYSQL_HOST, MYSQL_PASSWORD, MYSQL_PORT, MYSQL_USER
+import config as _config_module
 
 
 class DatabaseManager:
-    def __init__(self):
-        self.host = MYSQL_HOST
-        self.user = MYSQL_USER
-        self.password = MYSQL_PASSWORD
-        self.database = MYSQL_DATABASE
-        self.port = MYSQL_PORT
+    def __init__(self, db_config: Optional[Dict] = None):
+        """
+        Parameters
+        ----------
+        db_config : dict, optional
+            Keys: host, user, password, database, port.
+            When omitted the values are read from config.load() so that the
+            persisted JSON file (written by the UI dialog) is always used.
+        """
+        cfg = db_config or _config_module.load()
+        self.host     = cfg.get("host",     _config_module.MYSQL_HOST)
+        self.user     = cfg.get("user",     _config_module.MYSQL_USER)
+        self.password = cfg.get("password", _config_module.MYSQL_PASSWORD)
+        self.database = cfg.get("database", _config_module.MYSQL_DATABASE)
+        self.port     = int(cfg.get("port", _config_module.MYSQL_PORT))
+
+    # ── connection ────────────────────────────────────────────────────────────
 
     def get_connection(self):
         try:
@@ -26,6 +37,13 @@ class DatabaseManager:
             )
         except Error as error:
             raise ConnectionError(f"Database connection failed: {error}")
+
+    def test_connection(self) -> None:
+        """Open and immediately close a connection — raises on failure."""
+        conn = self.get_connection()
+        conn.close()
+
+    # ── static helpers ────────────────────────────────────────────────────────
 
     @staticmethod
     def current_datetime() -> str:
@@ -55,10 +73,10 @@ class DatabaseManager:
         if not person:
             return "Unknown"
 
-        last_name = person.get("last_name") or ""
-        first_name = person.get("first_name") or ""
+        last_name   = person.get("last_name")   or ""
+        first_name  = person.get("first_name")  or ""
         middle_name = person.get("middle_name") or ""
-        suffix = person.get("suffix") or ""
+        suffix      = person.get("suffix")      or ""
 
         full_name = f"{last_name}, {first_name}".strip(", ")
 
@@ -626,12 +644,6 @@ class DatabaseManager:
 
         used_by_student_id = self.find_student_index_by_rfid_uid(normalized_uid)
         is_used = 1 if used_by_student_id is not None else 0
-
-        print("[RFID BUFFER DEBUG]")
-        print("Scanned UID:", normalized_uid)
-        print("Found student ID:", used_by_student_id)
-        print("Is used:", is_used)
-        print("Connected database:", self.database)
 
         connection = self.get_connection()
         cursor = None
