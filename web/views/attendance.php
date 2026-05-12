@@ -4,7 +4,7 @@ require_once __DIR__ . '/../config/session.php';
 session_start();
 
 if (empty($_SESSION['user_id'])) {
-    header('Location: index.php');
+  header('Location: login.php');
     exit;
 }
 
@@ -123,7 +123,7 @@ require_once __DIR__ . '/../controllers/csrf.php';
             type="text"
             id="searchInput"
             class="filter-input"
-            placeholder="Search by Name/ID"
+            placeholder="Search by Name/RFID UID"
           />
         </div>
 
@@ -165,8 +165,9 @@ require_once __DIR__ . '/../controllers/csrf.php';
           <thead>
             <tr>
               <th>Date</th>
-              <th>ID</th>
+              <th>RFID UID</th>
               <th>Name</th>
+              <th>Status</th>
               <th>Time In</th>
               <th>Time Out</th>
             </tr>

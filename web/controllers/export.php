@@ -88,7 +88,11 @@ try {
     if ($exportType === 'students') {
         $sql = "
             SELECT id, student_number, rfid_uid, last_name, first_name, middle_name,
-                   category, program, year_level, strand, department, created_at
+                   category, program, year_level, strand, department, created_at,
+                   CASE
+                       WHEN rfid_uid IS NOT NULL AND rfid_uid <> '' THEN 'Registered'
+                       ELSE 'Unregistered'
+                   END AS status
             FROM students
             ORDER BY last_name ASC, first_name ASC
         ";
@@ -100,9 +104,9 @@ try {
         
         // Build headers based on category
         if ($includeStrand) {
-            $headers = ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department', 'Strand'];
+            $headers = ['Student No.', 'RFID UID', 'Status', 'Name', 'Program', 'Year Level', 'Department', 'Strand'];
         } else {
-            $headers = ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'];
+            $headers = ['Student No.', 'RFID UID', 'Status', 'Name', 'Program', 'Year Level', 'Department'];
         }
 
         if (!empty($filters['search'])) {
@@ -111,9 +115,10 @@ try {
                 $fullName  = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
                 $studentNo = strtolower((string) ($row['student_number'] ?? ''));
                 $rfid      = strtolower((string) ($row['rfid_uid'] ?? ''));
+                $status    = strtolower((string) ($row['status'] ?? ''));
 
                 foreach ($searchTerms as $term) {
-                    if (str_contains($fullName, $term) || str_contains($studentNo, $term) || str_contains($rfid, $term)) {
+                    if (str_contains($fullName, $term) || str_contains($studentNo, $term) || str_contains($rfid, $term) || str_contains($status, $term)) {
                         return true;
                     }
                 }
@@ -158,12 +163,16 @@ try {
     } elseif ($exportType === 'employees') {
         $sql = "
             SELECT id, employee_number, rfid_uid, last_name, first_name, middle_name,
-                   position, department, created_at
+                   position, department, created_at,
+                   CASE
+                       WHEN rfid_uid IS NOT NULL AND rfid_uid <> '' THEN 'Registered'
+                       ELSE 'Unregistered'
+                   END AS status
             FROM employees
             ORDER BY last_name ASC, first_name ASC
         ";
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Employee No.', 'RFID UID', 'Name', 'Position', 'Department'];
+        $headers = ['Employee No.', 'RFID UID', 'Status', 'Name', 'Position', 'Department'];
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -171,9 +180,10 @@ try {
                 $fullName = strtolower(trim($row['last_name'] . ', ' . $row['first_name'] . ' ' . ($row['middle_name'] ?? '')));
                 $empNo    = strtolower((string) ($row['employee_number'] ?? ''));
                 $rfid     = strtolower((string) ($row['rfid_uid'] ?? ''));
+                $status   = strtolower((string) ($row['status'] ?? ''));
 
                 foreach ($searchTerms as $term) {
-                    if (str_contains($fullName, $term) || str_contains($empNo, $term) || str_contains($rfid, $term)) {
+                    if (str_contains($fullName, $term) || str_contains($empNo, $term) || str_contains($rfid, $term) || str_contains($status, $term)) {
                         return true;
                     }
                 }
@@ -195,15 +205,15 @@ try {
         $sql = "
             SELECT
                 a.id,
-                a.student_id,
-                a.employee_id,
+                a.rfid_uid,
+                a.registration_status,
                 a.log_date,
                 a.time_in,
                 a.time_out,
                 a.status,
                 CASE
-                    WHEN a.student_id  IS NOT NULL THEN 'Student'
-                    WHEN a.employee_id IS NOT NULL THEN 'Employee'
+                    WHEN s.id IS NOT NULL THEN 'Student'
+                    WHEN e.id IS NOT NULL THEN 'Employee'
                     ELSE 'Unknown'
                 END AS record_type,
                 s.student_number  AS s_reference_number,
@@ -215,13 +225,13 @@ try {
                 e.first_name      AS e_first_name,
                 e.department      AS e_department
             FROM attendance_logs a
-            LEFT JOIN students  s ON s.id = a.student_id
-            LEFT JOIN employees e ON e.id = a.employee_id
+            LEFT JOIN students  s ON UPPER(s.rfid_uid) = UPPER(a.rfid_uid)
+            LEFT JOIN employees e ON UPPER(e.rfid_uid) = UPPER(a.rfid_uid)
             ORDER BY a.log_date DESC, a.time_in DESC
         ";
 
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Date', 'ID', 'Name', 'Time In', 'Time Out'];
+        $headers = ['Date', 'RFID UID', 'Status', 'Name', 'Time In', 'Time Out'];
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -233,12 +243,11 @@ try {
                     $name = strtolower(trim($row['e_last_name'] . ', ' . $row['e_first_name']));
                 }
 
-                $studentRef  = trim((string) ($row['s_reference_number'] ?? ''));
-                $employeeRef = trim((string) ($row['e_reference_number'] ?? ''));
-                $refNum      = strtolower($studentRef !== '' ? $studentRef : $employeeRef);
+                $refNum = strtolower((string) ($row['rfid_uid'] ?? ''));
+                $status = strtolower((string) ($row['registration_status'] ?? ''));
 
                 foreach ($searchTerms as $term) {
-                    if (str_contains($name, $term) || str_contains($refNum, $term)) {
+                    if (str_contains($name, $term) || str_contains($refNum, $term) || str_contains($status, $term)) {
                         return true;
                     }
                 }
@@ -429,10 +438,10 @@ try {
             $refNum = '';
             if (!empty($record['s_first_name'])) {
                 $name   = trim($record['s_last_name'] . ', ' . $record['s_first_name']);
-                $refNum = $record['s_reference_number'];
+                $refNum = $record['rfid_uid'];
             } elseif (!empty($record['e_first_name'])) {
                 $name   = trim($record['e_last_name'] . ', ' . $record['e_first_name']);
-                $refNum = $record['e_reference_number'];
+                $refNum = $record['rfid_uid'];
             }
 
             $timeIn  = $record['time_in']  ? substr($record['time_in'],  0, 5) : '-';
@@ -441,6 +450,7 @@ try {
             $rowData = [
                 $record['log_date'],
                 $refNum,
+                $record['registration_status'] ?? 'unregistered',
                 $name,
                 $timeIn,
                 $timeOut,

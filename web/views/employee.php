@@ -4,7 +4,7 @@ require_once __DIR__ . '/../config/session.php';
 session_start();
 
 if (empty($_SESSION['user_id'])) {
-    header('Location: index.php');
+  header('Location: login.php');
     exit;
 }
 
@@ -158,6 +158,7 @@ require_once __DIR__ . '/../controllers/csrf.php';
             <tr>
               <th>Employee No.</th>
               <th>RFID UID</th>
+              <th>Status</th>
               <th>Name</th>
               <th>Position</th>
               <th>Department</th>

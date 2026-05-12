@@ -72,9 +72,28 @@ function resolve_display_name(array $row): string
  */
 function resolve_reference_number(array $row): string
 {
-    return trim((string) ($row['s_reference_number'] ?? ''))
+    return trim((string) ($row['rfid_uid'] ?? ''))
+        ?: trim((string) ($row['s_reference_number'] ?? ''))
         ?: trim((string) ($row['e_reference_number'] ?? ''))
         ?: '-';
+}
+
+/**
+ * Resolves the registration status for an attendance log row.
+ */
+function resolve_registration_status(array $row): string
+{
+    $status = trim((string) ($row['registration_status'] ?? ''));
+
+    if ($status !== '') {
+        return $status;
+    }
+
+    return (
+        trim((string) ($row['rfid_uid'] ?? '')) !== ''
+        || trim((string) ($row['s_reference_number'] ?? '')) !== ''
+        || trim((string) ($row['e_reference_number'] ?? '')) !== ''
+    ) ? 'Registered' : 'Unregistered';
 }
 
 /**

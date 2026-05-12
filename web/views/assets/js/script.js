@@ -311,12 +311,13 @@ function buildRowModel(pageType, record) {
         cells: [
           escapeText(record.student_number),
           escapeText(record.rfid_uid),
+          escapeText(record.status || (record.rfid_uid && record.rfid_uid !== '-' ? 'registered' : 'unregistered')),
           escapeText(record.name),
           escapeText(record.program),
           escapeText(record.year_level),
           escapeText(record.department),
         ],
-        searchText: [record.student_number, record.rfid_uid, record.name, record.program, record.year_level, record.department, record.strand].join(' ').toLowerCase(),
+        searchText: [record.student_number, record.rfid_uid, record.status, record.name, record.program, record.year_level, record.department, record.strand].join(' ').toLowerCase(),
         department: escapeText(record.department),
         yearLevel:  escapeText(record.year_level),
         program:    escapeText(record.program),
@@ -331,11 +332,12 @@ function buildRowModel(pageType, record) {
         cells: [
           escapeText(record.employee_number),
           escapeText(record.rfid_uid),
+          escapeText(record.status || (record.rfid_uid && record.rfid_uid !== '-' ? 'registered' : 'unregistered')),
           escapeText(record.name),
           escapeText(record.position),
           escapeText(record.department),
         ],
-        searchText: [record.employee_number, record.rfid_uid, record.name, record.position, record.department].join(' ').toLowerCase(),
+        searchText: [record.employee_number, record.rfid_uid, record.status, record.name, record.position, record.department].join(' ').toLowerCase(),
         department: escapeText(record.department),
         position:   escapeText(record.position),
         typeValue:  '',
@@ -346,12 +348,13 @@ function buildRowModel(pageType, record) {
       return {
         cells: [
           escapeText(record.log_date),
-          escapeText(record.reference_number),
+          escapeText(record.rfid_uid),
           escapeText(record.name),
+          escapeText(record.registration_status || 'unregistered'),
           formatTime(record.time_in),
           formatTime(record.time_out),
         ],
-        searchText: [record.reference_number, record.name, record.department, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
+        searchText: [record.rfid_uid, record.name, record.department, record.registration_status, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
         department: escapeText(record.department),
         program:    escapeText(record.program || ''),
         yearLevel:  escapeText(record.year_level || ''),
@@ -1083,18 +1086,18 @@ function getExportHeadersAndRows(pageType, rows) {
   switch (pageType) {
     case 'students':
       return {
-        headers: ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'],
-        rows: rows.map((r) => [escapeText(r.student_number), escapeText(r.rfid_uid), escapeText(r.name), escapeText(r.program), escapeText(r.year_level), escapeText(r.department)]),
+        headers: ['Student No.', 'RFID UID', 'Status', 'Name', 'Program', 'Year Level', 'Department'],
+        rows: rows.map((r) => [escapeText(r.student_number), escapeText(r.rfid_uid), escapeText(r.status || 'unregistered'), escapeText(r.name), escapeText(r.program), escapeText(r.year_level), escapeText(r.department)]),
       };
     case 'employees':
       return {
-        headers: ['Employee No.', 'RFID UID', 'Name', 'Position', 'Department'],
-        rows: rows.map((r) => [escapeText(r.employee_number), escapeText(r.rfid_uid), escapeText(r.name), escapeText(r.position), escapeText(r.department)]),
+        headers: ['Employee No.', 'RFID UID', 'Status', 'Name', 'Position', 'Department'],
+        rows: rows.map((r) => [escapeText(r.employee_number), escapeText(r.rfid_uid), escapeText(r.status || 'unregistered'), escapeText(r.name), escapeText(r.position), escapeText(r.department)]),
       };
     case 'attendance':
       return {
-        headers: ['Date', 'ID', 'Name', 'Time In', 'Time Out'],
-        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.reference_number), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
+        headers: ['Date', 'RFID UID', 'Status', 'Name', 'Time In', 'Time Out'],
+        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.reference_number), escapeText(r.registration_status || 'unregistered'), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
       };
     default:
       return { headers: [], rows: [] };
@@ -1255,7 +1258,7 @@ function getExportModalBody(pageType, rows) {
       <div class="export-body-grid">
         <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or ID Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or RFID UID" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
           <div id="exportSearchResults" style="position:absolute;left:0;right:0;top:100%;margin-top:6px;border:1px solid #d0d7de;border-radius:8px;max-height:220px;overflow-y:auto;display:none;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,0.12);z-index:50;"></div>
         </div>
         <div class="export-section-label export-field-full">Filter By (Date Range)</div>
@@ -1283,7 +1286,7 @@ function getExportModalBody(pageType, rows) {
           <label for="exportPrimarySort">Primary Sort</label>
           <select id="exportPrimarySort" class="export-control export-select">
             <option value="log_date">Date</option>
-            <option value="reference_number">ID Number</option>
+            <option value="reference_number">RFID UID</option>
             <option value="name">Name</option>
             <option value="type">Type</option>
           </select>
@@ -1541,7 +1544,7 @@ function getExportSearchCandidate(record, pageType) {
       name:       escapeText(record.name),
       department: escapeText(record.department),
       display:    `${escapeText(record.reference_number)} — ${escapeText(record.name)}`,
-      searchText: [record.reference_number, record.name, record.department, record.record_type, record.log_date].join(' ').toLowerCase(),
+      searchText: [record.reference_number, record.name, record.department, record.registration_status, record.record_type, record.log_date].join(' ').toLowerCase(),
     };
   }
   return null;
@@ -1706,7 +1709,7 @@ async function handleExport() {
   formData.append('filters', JSON.stringify(filters));
 
   try {
-    const response = await fetch('../api/export.php', { method: 'POST', body: formData });
+    const response = await fetch('../controllers/export.php', { method: 'POST', body: formData });
     const contentType = response.headers.get('content-type') || '';
     if (!response.ok || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
       throw new Error('Export failed. Please try again.');
@@ -2119,7 +2122,7 @@ async function saveEditStudent() {
 
   const rfid = document.getElementById('editStudentRfid')?.value.trim() || '';
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/students.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/students.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
     showToast('Student RFID updated successfully.', 'success');
     closeEditStudentModal();
@@ -2225,7 +2228,7 @@ async function saveAddStudent() {
   }
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/students.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/students.php';
     await apiRequest(endpoint, 'POST', body);
     showToast('Student added successfully.', 'success');
     closeAddStudentModal();
@@ -2312,7 +2315,7 @@ async function saveEditEmployee() {
 
   const rfid = document.getElementById('editEmployeeRfid')?.value.trim() || '';
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/employees.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/employees.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
     showToast('Employee RFID updated successfully.', 'success');
     closeEditEmployeeModal();
@@ -2352,7 +2355,7 @@ async function saveAddEmployee() {
   }
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/employees.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/employees.php';
     await apiRequest(endpoint, 'POST', body);
     showToast('Employee added successfully.', 'success');
     closeAddEmployeeModal();
@@ -2383,7 +2386,7 @@ async function handleImportFile(file) {
   if (file.size > maxSize)         { showToast('Import failed: file is larger than 25 MB.', 'error'); return; }
 
   const entity   = importState.entity;
-  const endpoint = getEndpoint(tableState.table) || `../../api/${entity}.php`;
+  const endpoint = getEndpoint(tableState.table) || `../../controllers/${entity}.php`;
   const formData = new FormData();
   formData.append('file', file);
 
@@ -2476,7 +2479,7 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
   let currentRfidContext  = null;
   let lastValidatedRfid   = null;
 
-  const RFID_API_URL = '/fcpc-tap-track/web/api/students.php?action=latest-rfid';
+  const RFID_API_URL = '/fcpc-tap-track/web/controllers/students.php?action=latest-rfid';
 
   (async function initRfidBufferId() {
     try {
@@ -2521,7 +2524,7 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
     lastValidatedRfid = rfidUid;
 
     const endpoint = moduleType.includes('student') ? 'students.php' : 'employees.php';
-    const apiUrl = `../api/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
+    const apiUrl = `../controllers/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
 
     try {
       const response = await fetch(apiUrl, { headers: { Accept: 'application/json' } });
