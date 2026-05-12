@@ -24,7 +24,7 @@ $sql = "
         CASE
             WHEN s.id IS NOT NULL THEN 'Student'
             WHEN e.id IS NOT NULL THEN 'Employee'
-            ELSE 'Unknown'
+            ELSE 'Unregistered'
         END AS record_type,
 
         s.student_number  AS s_reference_number,

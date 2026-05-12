@@ -205,7 +205,7 @@ try {
         $sql = "
             SELECT
                 a.id,
-                a.rfid_uid,
+                COALESCE(NULLIF(TRIM(a.rfid_uid), ''), '-') AS rfid_uid,
                 a.registration_status,
                 a.log_date,
                 a.time_in,
@@ -214,7 +214,7 @@ try {
                 CASE
                     WHEN s.id IS NOT NULL THEN 'Student'
                     WHEN e.id IS NOT NULL THEN 'Employee'
-                    ELSE 'Unknown'
+                    ELSE 'Unregistered'
                 END AS record_type,
                 s.student_number  AS s_reference_number,
                 s.last_name       AS s_last_name,
@@ -435,13 +435,11 @@ try {
             ];
         } else {
             $name   = '';
-            $refNum = '';
+            $refNum = $record['rfid_uid'] ?: '-';
             if (!empty($record['s_first_name'])) {
                 $name   = trim($record['s_last_name'] . ', ' . $record['s_first_name']);
-                $refNum = $record['rfid_uid'];
             } elseif (!empty($record['e_first_name'])) {
                 $name   = trim($record['e_last_name'] . ', ' . $record['e_first_name']);
-                $refNum = $record['rfid_uid'];
             }
 
             $timeIn  = $record['time_in']  ? substr($record['time_in'],  0, 5) : '-';
@@ -450,7 +448,7 @@ try {
             $rowData = [
                 $record['log_date'],
                 $refNum,
-                $record['registration_status'] ?? 'unregistered',
+                ucfirst(strtolower((string) ($record['registration_status'] ?? 'Unregistered'))),
                 $name,
                 $timeIn,
                 $timeOut,

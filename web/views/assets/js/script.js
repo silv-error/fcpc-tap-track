@@ -355,7 +355,7 @@ function buildRowModel(pageType, record) {
           escapeText(record.log_date),
           escapeText(record.rfid_uid),
           escapeText(record.name),
-          escapeText(record.registration_status || 'unregistered'),
+          escapeText(record.registration_status || 'Unregistered'),
           formatTime(record.time_in),
           formatTime(record.time_out),
         ],
@@ -365,6 +365,7 @@ function buildRowModel(pageType, record) {
         yearLevel:  escapeText(record.year_level || ''),
         strand:     escapeText(record.strand || ''),
         category:   escapeText(record.category || ''),
+        statusValue: escapeText(record.registration_status || 'Unregistered'),
         typeValue:  escapeText(record.record_type),
         dateValue:  normalizeDate(record.log_date),
       };
@@ -741,6 +742,7 @@ function applyFilters(resetPage = true) {
   const search     = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
   const type       = (document.getElementById('typeSelect')?.value || 'all').toLowerCase();
   const date       = normalizeDate(document.getElementById('dateInput')?.value || '');
+  const status     = (document.getElementById('statusSelect')?.value || 'all').toLowerCase();
   const dept       = (document.getElementById('departmentSelect')?.value || 'all').toLowerCase();
   const category   = (document.getElementById('categorySelect')?.value || 'all').toLowerCase();
   const yearLevel  = (document.getElementById('yearLevelSelect')?.value || 'all').toLowerCase();
@@ -753,6 +755,10 @@ function applyFilters(resetPage = true) {
     if (search && !model.searchText.includes(search)) return false;
     if (type !== 'all' && model.typeValue.toLowerCase() !== type) return false;
     if (date && model.dateValue !== date) return false;
+
+    if (tableState.pageType === 'attendance') {
+      if (status !== 'all' && (model.statusValue || '').toLowerCase() !== status) return false;
+    }
 
     if (tableState.pageType === 'students') {
       if (category !== 'all' && model.category.toLowerCase() !== category) return false;
@@ -1285,6 +1291,16 @@ function getExportModalBody(pageType, rows) {
               </label>`).join('')}
           </div>
         </div>
+
+        <div class="export-field">
+          <label for="exportStatusSelect">Status</label>
+          <select id="exportStatusSelect" class="export-control export-select">
+            <option value="all">All</option>
+            <option value="registered">Registered</option>
+            <option value="unregistered">Unregistered</option>
+          </select>
+        </div>
+
         <div id="attendanceDynamicFilters" class="export-field export-field-full"></div>
         <div class="export-section-label export-field-full">Sort By</div>
         <div class="export-field">
@@ -1545,11 +1561,11 @@ function getExportSearchCandidate(record, pageType) {
   }
   if (pageType === 'attendance') {
     return {
-      id:         escapeText(record.reference_number),
+      id:         escapeText(record.rfid_uid),
       name:       escapeText(record.name),
       department: escapeText(record.department),
-      display:    `${escapeText(record.reference_number)} — ${escapeText(record.name)}`,
-      searchText: [record.reference_number, record.name, record.department, record.registration_status, record.record_type, record.log_date].join(' ').toLowerCase(),
+      display:    `${escapeText(record.rfid_uid)} — ${escapeText(record.name)}`,
+      searchText: [record.rfid_uid, record.name, record.department, record.registration_status, record.record_type, record.log_date].join(' ').toLowerCase(),
     };
   }
   return null;
@@ -1642,13 +1658,20 @@ function collectExportRows(pageType) {
     if (pageType === 'attendance') {
       const dateFrom      = normalizeDate(document.getElementById('exportDateFrom')?.value || '');
       const dateTo        = normalizeDate(document.getElementById('exportDateTo')?.value   || '');
+      const statusVal     = (document.getElementById('exportStatusSelect')?.value || 'all').toLowerCase();
       const selectedTypes = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value.toLowerCase());
       const isAllSelected = selectedTypes.includes('all') || !selectedTypes.length;
       const modelType     = (model.typeValue || '').toLowerCase();
 
       if (dateFrom && model.dateValue < dateFrom) return false;
       if (dateTo   && model.dateValue > dateTo)   return false;
-      if (!isAllSelected && !selectedTypes.includes(modelType)) return false;
+      if (statusVal !== 'all' && (model.statusValue || '').toLowerCase() !== statusVal) return false;
+
+      if (modelType === 'unregistered') {
+        // Unregistered rows are controlled by the Status filter only.
+      } else if (!isAllSelected && !selectedTypes.includes(modelType)) {
+        return false;
+      }
 
       const empDeptVal     = (document.getElementById('exportDepartmentSelect')?.value  || 'all').toLowerCase();
       const stuCategoryVal = (document.getElementById('exportCategorySelect')?.value    || 'all').toLowerCase();

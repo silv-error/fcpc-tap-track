@@ -137,6 +137,15 @@ require_once __DIR__ . '/../controllers/csrf.php';
         </div>
 
         <div class="filter-group">
+          <label for="statusSelect">Status</label>
+          <select id="statusSelect" class="filter-select">
+            <option value="all">All</option>
+            <option value="Registered">Registered</option>
+            <option value="Unregistered">Unregistered</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
           <label for="dateInput">Date</label>
           <input
             type="date"
