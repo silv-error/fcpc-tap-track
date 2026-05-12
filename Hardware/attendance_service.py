@@ -142,85 +142,69 @@ class AttendanceService:
 
             return response
 
-        if not person_data:
-            message = f"RFID UID is not registered: {uid}"
+        person = None
+        person_type = None
+        full_name = f"Unknown ({uid})"
 
-            self.safe_log_rfid_scan(
-                rfid_uid=uid,
-                scan_result="FAILED",
-                action=None,
-                message=message,
-                person_type=None,
-            )
+        if person_data:
+            person_type = person_data["person_type"]
+            person = person_data["person"]
+            full_name = self.format_full_name(person)
 
-            response = self.build_response(
-                success=False,
-                message=message,
-                action=None,
-                person=None,
-                person_type=None,
-                recorded_time=None,
-            )
+            logger.info("Registered person found.")
+            logger.info("Person type: %s", person_type)
+            logger.info("Person ID: %s", person.get("id"))
+            logger.info("Full name: %s", full_name)
+            logger.info("Is active: %s", person.get("is_active"))
 
-            logger.info("RFID TAP PROCESS ENDED: FAILED - UID NOT REGISTERED")
-            logger.info("=" * 70)
+            if int(person.get("is_active", 0)) != 1:
+                message = f"{person_type} is inactive: {full_name}"
 
-            return response
+                logger.warning(
+                    "RFID tap rejected because person is inactive. "
+                    "UID=%s, person_type=%s, person_id=%s, full_name=%s",
+                    uid,
+                    person_type,
+                    person.get("id"),
+                    full_name,
+                )
 
-        person_type = person_data["person_type"]
-        person = person_data["person"]
-        full_name = self.format_full_name(person)
+                self.safe_log_rfid_scan(
+                    rfid_uid=uid,
+                    scan_result="FAILED",
+                    action=None,
+                    message=message,
+                    person_type=person_type,
+                )
 
-        logger.info("Registered person found.")
-        logger.info("Person type: %s", person_type)
-        logger.info("Person ID: %s", person.get("id"))
-        logger.info("Full name: %s", full_name)
-        logger.info("Is active: %s", person.get("is_active"))
+                response = self.build_response(
+                    success=False,
+                    message=message,
+                    action=None,
+                    person=person,
+                    person_type=person_type,
+                    recorded_time=None,
+                )
 
-        if int(person.get("is_active", 0)) != 1:
-            message = f"{person_type} is inactive: {full_name}"
+                logger.info("RFID TAP PROCESS ENDED: FAILED - INACTIVE PERSON")
+                logger.info("=" * 70)
 
-            logger.warning(
-                "RFID tap rejected because person is inactive. "
-                "UID=%s, person_type=%s, person_id=%s, full_name=%s",
-                uid,
-                person_type,
-                person.get("id"),
-                full_name,
-            )
-
-            self.safe_log_rfid_scan(
-                rfid_uid=uid,
-                scan_result="FAILED",
-                action=None,
-                message=message,
-                person_type=person_type,
-            )
-
-            response = self.build_response(
-                success=False,
-                message=message,
-                action=None,
-                person=person,
-                person_type=person_type,
-                recorded_time=None,
-            )
-
-            logger.info("RFID TAP PROCESS ENDED: FAILED - INACTIVE PERSON")
-            logger.info("=" * 70)
-
-            return response
+                return response
+        else:
+            logger.info("RFID UID is not registered: %s", uid)
 
         logger.info(
-            "Checking active attendance log. person_id=%s, person_type=%s",
-            person.get("id"),
-            person_type,
+            "Checking active attendance log. person_id=%s, person_type=%s, uid=%s",
+            person.get("id") if person else None,
+            person_type or "Unregistered",
+            uid,
         )
 
         try:
             active_log = self.database_manager.get_active_attendance_log(
-                person_id=person["id"],
+                person_id=person["id"] if person else None,
                 person_type=person_type,
+                rfid_uid=None if person else uid,
             )
 
         except Exception as error:
@@ -230,8 +214,8 @@ class AttendanceService:
                 "Failed to get active attendance log. UID=%s, person_type=%s, "
                 "person_id=%s, Error=%s",
                 uid,
-                person_type,
-                person.get("id"),
+                person_type or "Unregistered",
+                person.get("id") if person else None,
                 error,
                 exc_info=True,
             )
@@ -259,6 +243,7 @@ class AttendanceService:
             return response
 
         if active_log:
+            person_id = person.get("id") if person else None
             logger.info(
                 "Active attendance log found. attendance_log_id=%s. "
                 "Proceeding with TIME_OUT.",
@@ -278,7 +263,7 @@ class AttendanceService:
                     "person_id=%s, attendance_log_id=%s, Error=%s",
                     uid,
                     person_type,
-                    person.get("id"),
+                    person_id,
                     active_log.get("id"),
                     error,
                     exc_info=True,
@@ -314,7 +299,7 @@ class AttendanceService:
                 "full_name=%s, time_out=%s",
                 uid,
                 person_type,
-                person.get("id"),
+                person_id,
                 full_name,
                 time_out,
             )
@@ -345,8 +330,10 @@ class AttendanceService:
 
         try:
             time_in = self.database_manager.create_time_in_log(
-                person_id=person["id"],
+                person_id=person["id"] if person else None,
                 person_type=person_type,
+                rfid_uid=uid,
+                registration_status="registered" if person else "unregistered",
             )
 
         except Exception as error:
@@ -356,8 +343,8 @@ class AttendanceService:
                 "Failed to create time-in log. UID=%s, person_type=%s, "
                 "person_id=%s, Error=%s",
                 uid,
-                person_type,
-                person.get("id"),
+                person_type or "Unregistered",
+                person.get("id") if person else None,
                 error,
                 exc_info=True,
             )
@@ -375,7 +362,7 @@ class AttendanceService:
                 message=message,
                 action="TIME_IN",
                 person=person,
-                person_type=person_type,
+                person_type=person_type or "Unregistered",
                 recorded_time=None,
             )
 
@@ -391,8 +378,8 @@ class AttendanceService:
             "TIME_IN successful. UID=%s, person_type=%s, person_id=%s, "
             "full_name=%s, time_in=%s",
             uid,
-            person_type,
-            person.get("id"),
+            person_type or "Unregistered",
+            person.get("id") if person else None,
             full_name,
             time_in,
         )
@@ -410,7 +397,7 @@ class AttendanceService:
             message=message,
             action=action,
             person=person,
-            person_type=person_type,
+            person_type=person_type or "Unregistered",
             recorded_time=time_in,
         )
 

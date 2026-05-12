@@ -1102,7 +1102,7 @@ function getExportHeadersAndRows(pageType, rows) {
     case 'attendance':
       return {
         headers: ['Date', 'RFID UID', 'Status', 'Name', 'Time In', 'Time Out'],
-        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.reference_number), escapeText(r.registration_status || 'unregistered'), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
+        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.rfid_uid), escapeText(r.registration_status || 'Unregistered'), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
       };
     default:
       return { headers: [], rows: [] };
@@ -1135,15 +1135,15 @@ function getExportSortValue(pageType, record, sortKey) {
 
 function getExportModalBody(pageType, rows) {
   const optionsFromRows = (field, allLabel) => {
-    const uniqueValues = getUniqueFieldValues(rows, field);
-    return [`<option value="all">${allLabel}</option>`, ...uniqueValues.map((v) => `<option value="${v.replace(/"/g, '&quot;')}">${v}</option>`)].join('');
+    const uniqueValues = [...new Set(rows.map((row) => escapeText(row?.[field])).filter((value) => value && value !== '-'))].sort((a, b) => a.localeCompare(b));
+    return [`<option value="all">${allLabel}</option>`, ...uniqueValues.map((value) => `<option value="${value.replace(/"/g, '&quot;')}">${value}</option>`)].join('');
   };
 
   if (pageType === 'students') {
     return `
       <div class="export-body-grid">
         <div class="export-field export-field-full" style="position:relative;">
-          <label for="exportSearchInput">Search</label>
+        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.rfid_uid), escapeText(r.registration_status || 'Unregistered'), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
           <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
           <div id="exportSearchResults" style="position:absolute;left:0;right:0;top:100%;margin-top:6px;border:1px solid #d0d7de;border-radius:8px;max-height:220px;overflow-y:auto;display:none;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,0.12);z-index:50;"></div>
         </div>

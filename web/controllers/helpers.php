@@ -161,7 +161,7 @@ function resolve_registration_status(array $row): string
     $status = trim((string) ($row['registration_status'] ?? ''));
 
     if ($status !== '') {
-        return $status;
+        return ucfirst(strtolower($status));
     }
 
     return (
