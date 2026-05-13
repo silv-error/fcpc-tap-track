@@ -64,10 +64,7 @@ HTTP_METHOD_COLORS = {
     "DELETE": C_RED,
 }
 
-<<<<<<< update/gui-database-configuration
 # ── Column headers ─────────────────────────────────────────────────────────────
-=======
->>>>>>> main
 RFID_HEADER = (
     f"{'#':>4}  "
     f"{'TIME':<8}  "
@@ -135,7 +132,6 @@ class _PulseDot(tk.Canvas):
         self._color   = color
         self.itemconfig(self._dot, fill=color)
 
-<<<<<<< update/gui-database-configuration
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  DB CONFIG DIALOG
@@ -350,8 +346,6 @@ class _DbConfigDialog(tk.Toplevel):
 #  READER WATCHER
 # ══════════════════════════════════════════════════════════════════════════════
 
-=======
->>>>>>> main
 class _ReaderWatcher:
     POLL_MS = 800
 
@@ -841,7 +835,6 @@ class AttendanceUI:
         self._http_text.insert("1.0", HTTP_HEADER, "HEADER")
         self._http_text.configure(state="disabled")
 
-<<<<<<< update/gui-database-configuration
     # ── DB config dialog ──────────────────────────────────────────────────────
 
     def _open_db_config_dialog(self):
@@ -887,9 +880,6 @@ class AttendanceUI:
             })
 
     # ── clock & event pump ────────────────────────────────────────────────────
-=======
-    # clock & event pump
->>>>>>> main
 
     def _tick_clock(self):
         self._clock_var.set(datetime.now().strftime("%Y-%m-%d   %H:%M:%S"))
@@ -1206,7 +1196,6 @@ class AttendanceUI:
             self._queue_backend_button_state(False)
             self.post_system("Backend thread stopped.")
 
-<<<<<<< update/gui-database-configuration
     # ── public accessor: resolved DB config ───────────────────────────────────
 
     def get_db_config(self) -> Optional[dict]:
@@ -1214,9 +1203,6 @@ class AttendanceUI:
         return self._db_config
 
     # ── launch ────────────────────────────────────────────────────────────────
-=======
-    # launch 
->>>>>>> main
 
     def launch(self, backend_start_fn=None, backend_stop_fn=None, auto_start=False):
         self._backend_start_fn = backend_start_fn
