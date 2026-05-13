@@ -1149,7 +1149,6 @@ function getExportModalBody(pageType, rows) {
     return `
       <div class="export-body-grid">
         <div class="export-field export-field-full" style="position:relative;">
-        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.rfid_uid), escapeText(r.registration_status || 'Unregistered'), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
           <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
           <div id="exportSearchResults" style="position:absolute;left:0;right:0;top:100%;margin-top:6px;border:1px solid #d0d7de;border-radius:8px;max-height:220px;overflow-y:auto;display:none;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,0.12);z-index:50;"></div>
         </div>
@@ -1281,15 +1280,13 @@ function getExportModalBody(pageType, rows) {
           <label for="exportDateTo">To</label>
           <input id="exportDateTo" type="date" class="export-control" />
         </div>
-        <div class="export-field export-field-full">
+        <div class="export-field">
           <label>Type</label>
-          <div class="export-checkbox-row">
-            ${['All', 'Student', 'Employee'].map((v) => `
-              <label class="export-checkbox">
-                <input type="checkbox" name="exportUserType" value="${v}" onchange="updateAttendanceTypeFilters()" />
-                <span>${v}</span>
-              </label>`).join('')}
-          </div>
+          <select id="exportUserTypeSelect" class="export-control export-select" onchange="updateAttendanceTypeFilters(this.value)">
+            <option value="all">All</option>
+            <option value="student">Student</option>
+            <option value="employee">Employee</option>
+          </select>
         </div>
 
         <div class="export-field">
@@ -1413,10 +1410,15 @@ function updateAttendanceTypeFilters() {
   const container = document.getElementById('attendanceDynamicFilters');
   if (!container) return;
 
-  const checked = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value.toLowerCase());
+  const selectedType = (arguments[0] || document.getElementById('exportUserTypeSelect')?.value || 'all').toLowerCase();
   container.innerHTML = '';
 
-  if (checked.includes('employee')) {
+  if (selectedType === 'all') {
+    container.innerHTML = '<div class="export-filter-status" style="font-size:12px;color:#777;">Choose Student or Employee to show additional filters.</div>';
+    return;
+  }
+
+  if (selectedType === 'employee') {
     container.insertAdjacentHTML('beforeend', `
       <div class="export-section-label export-field-full">Employee Filters</div>
       <div class="export-field">
@@ -1428,7 +1430,7 @@ function updateAttendanceTypeFilters() {
       </div>`);
   }
 
-  if (checked.includes('student')) {
+  if (selectedType === 'student') {
     container.insertAdjacentHTML('beforeend', getStudentFiltersFragment());
     updateYearLevelOptions(document.getElementById('exportCategorySelect')?.value || 'all');
     updateExportFiltersForCategory(document.getElementById('exportCategorySelect')?.value || 'all');
@@ -1450,6 +1452,10 @@ function updateExportFiltersForCategory(category) {
 
   const enableSelect  = (el) => { if (el) el.disabled = false; };
   const disableSelect = (el) => { if (el) { el.disabled = true; el.value = 'all'; } };
+  const showFilter = (wrapper, visible) => {
+    if (!wrapper) return;
+    wrapper.style.display = visible ? '' : 'none';
+  };
 
   const updateFilterStatus = (wrapper, enabled, message = '') => {
     if (!wrapper) return;
@@ -1464,6 +1470,11 @@ function updateExportFiltersForCategory(category) {
   disableSelect(programSelect);
   disableSelect(yearLevelSelect);
   disableSelect(strandSelect);
+
+  showFilter(filters.department, true);
+  showFilter(filters.program, true);
+  showFilter(filters.yearLevel, true);
+  showFilter(filters.strand, true);
 
   updateYearLevelOptions(category);
 
@@ -1480,8 +1491,9 @@ function updateExportFiltersForCategory(category) {
     updateFilterStatus(filters.strand,     true);
 
   } else if (category === 'Basic Education') {
-    enableSelect(departmentSelect);
+    showFilter(filters.department, false);
     setSelectOptions(programSelect, getStudentProgramOptions('Basic Education'), 'All Programs');
+    showFilter(filters.program, false);
     disableSelect(programSelect);
     enableSelect(yearLevelSelect);
 
@@ -1491,9 +1503,11 @@ function updateExportFiltersForCategory(category) {
       if (applicable) {
         setSelectOptions(strandSelect, STRAND_OPTIONS, 'All Strands');
         enableSelect(strandSelect);
+        showFilter(filters.strand, true);
         updateFilterStatus(filters.strand, true);
       } else {
         disableSelect(strandSelect);
+        showFilter(filters.strand, false);
         updateFilterStatus(filters.strand, false, 'Available for Grade 11/12 only');
       }
     };
@@ -1501,7 +1515,7 @@ function updateExportFiltersForCategory(category) {
     updateStrandAvailability();
     if (yearLevelSelect) yearLevelSelect.onchange = updateStrandAvailability;
 
-    updateFilterStatus(filters.department, true);
+    updateFilterStatus(filters.department, false, 'Not applicable for Basic Education');
     updateFilterStatus(filters.program,    false, 'Not applicable for Basic Education');
     updateFilterStatus(filters.yearLevel,  true);
 
@@ -1511,6 +1525,7 @@ function updateExportFiltersForCategory(category) {
     enableSelect(programSelect);
     enableSelect(yearLevelSelect);
     disableSelect(strandSelect);
+    showFilter(filters.strand, false);
     if (yearLevelSelect) yearLevelSelect.onchange = null;
     updateFilterStatus(filters.department, true);
     updateFilterStatus(filters.program,    true);
@@ -1523,6 +1538,8 @@ function updateExportFiltersForCategory(category) {
     enableSelect(programSelect);
     disableSelect(yearLevelSelect);
     disableSelect(strandSelect);
+    showFilter(filters.yearLevel, false);
+    showFilter(filters.strand, false);
     if (yearLevelSelect) yearLevelSelect.onchange = null;
     updateFilterStatus(filters.department, true);
     updateFilterStatus(filters.program,    true);
@@ -1659,17 +1676,14 @@ function collectExportRows(pageType) {
       const dateFrom      = normalizeDate(document.getElementById('exportDateFrom')?.value || '');
       const dateTo        = normalizeDate(document.getElementById('exportDateTo')?.value   || '');
       const statusVal     = (document.getElementById('exportStatusSelect')?.value || 'all').toLowerCase();
-      const selectedTypes = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value.toLowerCase());
-      const isAllSelected = selectedTypes.includes('all') || !selectedTypes.length;
+        const selectedType  = (document.getElementById('exportUserTypeSelect')?.value || 'all').toLowerCase();
       const modelType     = (model.typeValue || '').toLowerCase();
 
       if (dateFrom && model.dateValue < dateFrom) return false;
       if (dateTo   && model.dateValue > dateTo)   return false;
       if (statusVal !== 'all' && (model.statusValue || '').toLowerCase() !== statusVal) return false;
 
-      if (modelType === 'unregistered') {
-        // Unregistered rows are controlled by the Status filter only.
-      } else if (!isAllSelected && !selectedTypes.includes(modelType)) {
+        if (selectedType !== 'all' && modelType !== selectedType) {
         return false;
       }
 
@@ -1724,12 +1738,19 @@ async function handleExport() {
     filters.search     = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.dateFrom   = document.getElementById('exportDateFrom')?.value || '';
     filters.dateTo     = document.getElementById('exportDateTo')?.value   || '';
-    filters.userTypes  = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value);
+    const selectedType = (document.getElementById('exportUserTypeSelect')?.value || 'all').toLowerCase();
+    filters.userTypes  = [selectedType];
+    filters.status     = document.getElementById('exportStatusSelect')?.value || 'all';
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
     filters.category   = document.getElementById('exportCategorySelect')?.value   || 'all';
     filters.program    = document.getElementById('exportProgramSelect')?.value     || 'all';
     filters.yearLevel  = document.getElementById('exportYearLevelSelect')?.value   || 'all';
     filters.strand     = document.getElementById('exportStrandSelect')?.value      || 'all';
+    filters.primarySort = document.getElementById('exportPrimarySort')?.value || 'log_date';
+    filters.sortOrder   = document.getElementById('exportSortOrder')?.value   || 'desc';
+  } else {
+    filters.primarySort = document.getElementById('exportPrimarySort')?.value || 'last_name';
+    filters.sortOrder   = document.getElementById('exportSortOrder')?.value   || 'asc';
   }
 
   const formData = new FormData();

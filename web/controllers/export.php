@@ -81,6 +81,70 @@ function sanitize_filename_piece(?string $value, string $fallback = 'all'): stri
     return $value !== '' ? $value : $fallback;
 }
 
+function attendance_display_name(array $row): string
+{
+    if (!empty($row['s_first_name'])) {
+        return trim((string) ($row['s_last_name'] . ', ' . $row['s_first_name']));
+    }
+
+    if (!empty($row['e_first_name'])) {
+        return trim((string) ($row['e_last_name'] . ', ' . $row['e_first_name']));
+    }
+
+    return '';
+}
+
+function get_export_sort_value(string $exportType, array $row, string $sortKey): string
+{
+    $sortKey = strtolower(trim($sortKey));
+
+    if ($exportType === 'students') {
+        return match ($sortKey) {
+            'student_number' => (string) ($row['student_number'] ?? ''),
+            'department'     => (string) ($row['department'] ?? ''),
+            'program'        => (string) ($row['program'] ?? ''),
+            'year_level'     => (string) ($row['year_level'] ?? ''),
+            default          => (string) ($row['last_name'] ?? ''),
+        };
+    }
+
+    if ($exportType === 'employees') {
+        return match ($sortKey) {
+            'employee_number' => (string) ($row['employee_number'] ?? ''),
+            'department'      => (string) ($row['department'] ?? ''),
+            'position'        => (string) ($row['position'] ?? ''),
+            default           => (string) ($row['last_name'] ?? ''),
+        };
+    }
+
+    if ($exportType === 'attendance') {
+        return match ($sortKey) {
+            'reference_number' => (string) ($row['rfid_uid'] ?? ''),
+            'name'             => attendance_display_name($row),
+            'type'             => (string) ($row['record_type'] ?? ''),
+            default            => trim((string) (($row['log_date'] ?? '') . ' ' . ($row['time_in'] ?? ''))),
+        };
+    }
+
+    return '';
+}
+
+function sort_export_rows(array &$data, string $exportType, string $sortKey, string $sortOrder): void
+{
+    $sortOrder = strtolower(trim($sortOrder));
+    if ($sortOrder !== 'desc') {
+        $sortOrder = 'asc';
+    }
+
+    usort($data, function (array $left, array $right) use ($exportType, $sortKey, $sortOrder): int {
+        $leftValue  = strtolower(get_export_sort_value($exportType, $left, $sortKey));
+        $rightValue = strtolower(get_export_sort_value($exportType, $right, $sortKey));
+        $cmp = strnatcasecmp($leftValue, $rightValue);
+
+        return $sortOrder === 'desc' ? $cmp * -1 : $cmp;
+    });
+}
+
 try {
     $data    = [];
     $headers = [];
@@ -160,6 +224,8 @@ try {
             $data = array_filter($data, fn($row) => strtolower($row['strand'] ?? '') === $strand);
         }
 
+        sort_export_rows($data, $exportType, (string) ($filters['primarySort'] ?? 'last_name'), (string) ($filters['sortOrder'] ?? 'asc'));
+
     } elseif ($exportType === 'employees') {
         $sql = "
             SELECT id, employee_number, rfid_uid, last_name, first_name, middle_name,
@@ -201,6 +267,8 @@ try {
             $data = array_filter($data, fn($row) => strtolower($row['position']) === $pos);
         }
 
+        sort_export_rows($data, $exportType, (string) ($filters['primarySort'] ?? 'last_name'), (string) ($filters['sortOrder'] ?? 'asc'));
+
     } elseif ($exportType === 'attendance') {
         $sql = "
             SELECT
@@ -219,6 +287,10 @@ try {
                 s.student_number  AS s_reference_number,
                 s.last_name       AS s_last_name,
                 s.first_name      AS s_first_name,
+                s.category        AS s_category,
+                s.program         AS s_program,
+                s.year_level      AS s_year_level,
+                s.strand          AS s_strand,
                 s.department      AS s_department,
                 e.employee_number AS e_reference_number,
                 e.last_name       AS e_last_name,
@@ -236,18 +308,14 @@ try {
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
             $data = array_filter($data, function ($row) use ($searchTerms) {
-                $name = '';
-                if ($row['s_first_name']) {
-                    $name = strtolower(trim($row['s_last_name'] . ', ' . $row['s_first_name']));
-                } elseif ($row['e_first_name']) {
-                    $name = strtolower(trim($row['e_last_name'] . ', ' . $row['e_first_name']));
-                }
-
+                $name = strtolower(attendance_display_name($row));
                 $refNum = strtolower((string) ($row['rfid_uid'] ?? ''));
                 $status = strtolower((string) ($row['registration_status'] ?? ''));
+                $recordType = strtolower((string) ($row['record_type'] ?? ''));
+                $logDate = strtolower((string) ($row['log_date'] ?? ''));
 
                 foreach ($searchTerms as $term) {
-                    if (str_contains($name, $term) || str_contains($refNum, $term) || str_contains($status, $term)) {
+                    if (str_contains($name, $term) || str_contains($refNum, $term) || str_contains($status, $term) || str_contains($recordType, $term) || str_contains($logDate, $term)) {
                         return true;
                     }
                 }
@@ -265,12 +333,56 @@ try {
             $data = array_filter($data, fn($row) => $row['log_date'] <= $dateTo);
         }
 
+        $statusFilter = strtolower(trim((string) ($filters['status'] ?? 'all')));
+        if ($statusFilter !== '' && $statusFilter !== 'all') {
+            $data = array_filter($data, fn($row) => strtolower((string) ($row['registration_status'] ?? '')) === $statusFilter);
+        }
+
         if (!empty($filters['userTypes']) && is_array($filters['userTypes'])) {
             $types = array_map('strtolower', $filters['userTypes']);
             if (!in_array('all', $types, true)) {
-                $data = array_filter($data, fn($row) => in_array(strtolower($row['record_type']), $types, true));
+                $data = array_filter($data, fn($row) => in_array(strtolower((string) ($row['record_type'] ?? '')), $types, true));
             }
         }
+
+        $departmentFilter = strtolower(trim((string) ($filters['department'] ?? 'all')));
+        if ($departmentFilter !== '' && $departmentFilter !== 'all') {
+            $data = array_filter($data, function ($row) use ($departmentFilter) {
+                $recordType = strtolower((string) ($row['record_type'] ?? ''));
+
+                if ($recordType === 'student') {
+                    return strtolower((string) ($row['s_department'] ?? '')) === $departmentFilter;
+                }
+
+                if ($recordType === 'employee') {
+                    return strtolower((string) ($row['e_department'] ?? '')) === $departmentFilter;
+                }
+
+                return true;
+            });
+        }
+
+        $categoryFilter = strtolower(trim((string) ($filters['category'] ?? 'all')));
+        if ($categoryFilter !== '' && $categoryFilter !== 'all') {
+            $data = array_filter($data, fn($row) => strtolower((string) ($row['record_type'] ?? '')) !== 'student' || strtolower((string) ($row['s_category'] ?? '')) === $categoryFilter);
+        }
+
+        $programFilter = strtolower(trim((string) ($filters['program'] ?? 'all')));
+        if ($programFilter !== '' && $programFilter !== 'all') {
+            $data = array_filter($data, fn($row) => strtolower((string) ($row['record_type'] ?? '')) !== 'student' || strtolower((string) ($row['s_program'] ?? '')) === $programFilter);
+        }
+
+        $yearLevelFilter = strtolower(trim((string) ($filters['yearLevel'] ?? 'all')));
+        if ($yearLevelFilter !== '' && $yearLevelFilter !== 'all') {
+            $data = array_filter($data, fn($row) => strtolower((string) ($row['record_type'] ?? '')) !== 'student' || strtolower((string) ($row['s_year_level'] ?? '')) === $yearLevelFilter);
+        }
+
+        $strandFilter = strtolower(trim((string) ($filters['strand'] ?? 'all')));
+        if ($strandFilter !== '' && $strandFilter !== 'all') {
+            $data = array_filter($data, fn($row) => strtolower((string) ($row['record_type'] ?? '')) !== 'student' || strtolower((string) ($row['s_strand'] ?? '')) === $strandFilter);
+        }
+
+        sort_export_rows($data, $exportType, (string) ($filters['primarySort'] ?? 'log_date'), (string) ($filters['sortOrder'] ?? 'desc'));
     }
 
     $data = array_values($data);
