@@ -1078,6 +1078,11 @@ body {
   white-space: nowrap;
 }
 
+.data-table[data-table-type="students"] th:nth-child(5),
+.data-table[data-table-type="students"] td:nth-child(5) {
+  min-width: 180px;
+}
+
 .attendance-table th,
 .attendance-table td {
   padding-left: 16px;
@@ -1524,293 +1529,79 @@ body {
 
 /* ===== MOBILE SIDEBAR FIX ===== */
 @media (max-width: 700px) {
-  /* Slim horizontal top bar */
-  .sidebar {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
-    min-width: 0 !important;
-    height: 52px !important;
-    min-height: 0 !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    padding: 0 !important;
-    border-radius: 0 !important;
-    box-shadow: 0 2px 8px rgba(16, 24, 64, 0.18);
-    overflow-x: auto;
-    overflow-y: hidden;
-    z-index: 220;
-    transition: none !important;
+ 
+  /* ── 1. Toolbar: stack actions ON TOP, filters below ── */
+  .table-toolbar {
+    display: flex;
+    flex-direction: column-reverse;   /* actions row first (visually on top) */
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 16px;
   }
-
-  /* Override collapsed state on mobile */
-  .sidebar.collapsed,
-  html.sidebar-collapsed .sidebar {
-    width: 100% !important;
-    min-width: 0 !important;
-    height: 52px !important;
-    flex-direction: row !important;
+ 
+  /* ── 2. Action buttons: full-width row, equal-width buttons ── */
+  .table-toolbar-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    width: 100%;
+    justify-content: stretch;
   }
-
-  /* Hide user/avatar section entirely */
-  .sidebar-user,
-  .sidebar-avatar,
-  .sidebar-user-info,
-  .sidebar.collapsed .sidebar-user,
-  html.sidebar-collapsed .sidebar-user {
-    display: none !important;
+ 
+  .table-toolbar-actions .toolbar-btn {
+    flex: 1 1 0;          /* all buttons share the row equally */
+    min-width: 0;
+    padding: 10px 6px;
+    font-size: 13px;
+    justify-content: center;
   }
-
-  /* Hide hamburger menu toggle */
-  .menu-toggle {
-    display: none !important;
-  }
-
-  /* Horizontal scrollable nav row */
-  .sidebar-nav,
-  .sidebar.collapsed .sidebar-nav,
-  html.sidebar-collapsed .sidebar-nav {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0 !important;
-    flex: 1;
-    height: 52px !important;
-    overflow-x: auto;
-    overflow-y: hidden;
-    gap: 0;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .sidebar-nav::-webkit-scrollbar {
-    display: none;
-  }
-
-  /* Each nav link: icon-only tap target */
-  .sidebar-nav a,
-  .sidebar.collapsed .sidebar-nav a,
-  html.sidebar-collapsed .sidebar-nav a {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0 18px !important;
-    height: 52px !important;
-    min-width: 52px !important;
-    font-size: 0 !important;
-    gap: 0 !important;
-    border-right: 1px solid rgba(255,255,255,0.1);
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
-
-  /* Icons */
-  .sidebar-nav a svg,
-  .sidebar.collapsed .sidebar-nav a svg,
-  html.sidebar-collapsed .sidebar-nav a svg {
-    width: 22px !important;
-    height: 22px !important;
-    margin: 0 !important;
-    flex-shrink: 0;
-  }
-
-  /* Show logout as icon in the nav bar */
-  .sidebar-logout,
-  .sidebar.collapsed .sidebar-logout,
-  html.sidebar-collapsed .sidebar-logout {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    padding: 0 !important;
-    border-top: none !important;
-    height: 52px !important;
-    flex-shrink: 0;
-  }
-
-  .btn-logout,
-  html.sidebar-collapsed .btn-logout {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    width: 52px !important;
-    height: 52px !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border-radius: 0 !important;
-    font-size: 0 !important;
-    gap: 0 !important;
-    border-left: 1px solid rgba(255,255,255,0.1);
-  }
-
-  .btn-logout svg {
-    width: 22px !important;
-    height: 22px !important;
-  }
-
-  .btn-logout:hover {
-    background: rgba(255,255,255,0.08) !important;
-    color: #fff !important;
-  }
-
-  /* Push main content below the fixed 52px top bar */
-  .main-content,
-  .sidebar.collapsed ~ .main-content,
-  html.sidebar-collapsed .main-content {
-    margin-left: 0 !important;
-    margin-top: 52px !important;
-    height: calc(100vh - 52px) !important;
-  }
-
-  /* Compact header */
-  .top-header {
-    padding: 8px 12px;
-  }
-
-  .header-logo img {
-    height: 28px;
-  }
-
-  /* Stack filters vertically */
+ 
+  /* ── 3. Filters: full-width vertical stack ── */
+  .table-toolbar-filters,
   .filters-row {
+    display: flex;
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    margin-bottom: 16px;
+    width: 100%;
+    margin-bottom: 0;
+    flex-wrap: nowrap;    /* prevent any accidental wrapping back to row */
   }
-
+ 
   .filter-group {
-    flex: 1 1 auto;
+    flex: none;
     width: 100%;
   }
-
+ 
+  /* Every filter input / select stretches full-width */
   .filter-input,
   .filter-select,
   .filter-select-department,
   .filter-select-course,
-  #programSelect {
-    max-width: 100%;
+  #programSelect,
+  #positionSelect {
+    width: 100%;
     min-width: 0;
-  }
-
-  .table-toolbar {
-    flex-direction: column-reverse;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .table-toolbar-actions {
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-
-  .table-toolbar-actions .toolbar-btn {
-    flex: 1 1 120px;
-    min-width: 0;
-  }
-
-  .table-toolbar-filters,
-  .filters-row {
-    width: 100%;
-  }
-
-  .table-toolbar-filters,
-  .filters-row,
-  .table-toolbar-filters .filter-group {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .table-toolbar-filters .filter-group,
-  .filters-row .filter-group {
-    width: 100%;
-    gap: 6px;
-  }
-
-  .table-toolbar-filters .filter-input,
-  .table-toolbar-filters .filter-select,
-  .filters-row .filter-input,
-  .filters-row .filter-select,
-  .filters-row .filter-select-department,
-  .filters-row .filter-select-course,
-  .filters-row #programSelect {
-    width: 100%;
     max-width: none;
-    min-width: 0;
+    box-sizing: border-box;
+  }
+ 
+  /* ── 4. Hidden filter groups still collapse properly ── */
+  .filter-group.hidden {
+    display: none !important;
   }
 
-  .filters-row {
-    gap: 12px;
-    margin-bottom: 0;
-  }
-
-  .page-content > .filters-row[style*="space-between"] {
-    flex-direction: column-reverse !important;
-    align-items: stretch !important;
-  }
-
-  .page-content > .filters-row[style*="space-between"] > div:first-child {
-    width: 100%;
-  }
-
-  .page-content > .filters-row[style*="space-between"] > button {
-    width: 100%;
-    margin-bottom: 12px;
-  }
-
-  .toolbar-btn {
-    padding: 8px 10px;
-    font-size: 13px;
-  }
-
-  .table-wrapper {
-    overflow-x: auto;
-  }
-
-  .data-table {
-    min-width: 640px;
-    font-size: 13px;
-    table-layout: auto;
-  }
-
-  .data-table th,
-  .data-table td {
-    padding: 8px 10px;
-  }
-
-  .data-table[data-table-type="students"] td:nth-child(5),
-  .data-table[data-table-type="students"] th:nth-child(5) {
-    max-width: 90px;
-    font-size: 11px;
-  }
-
-  .data-table thead th {
+  .menu-toggle {
+  display: none !important;
+}
+ 
+}
+ 
+/* ── Slightly tighter for very small phones (≤ 420px) ── */
+@media (max-width: 420px) {
+  .table-toolbar-actions .toolbar-btn {
     font-size: 12px;
-    padding: 8px 10px;
-  }
-
-  .data-table tbody tr {
-    background: transparent !important;
-  }
-
-  .data-table td:last-child {
-    text-align: right;
-    white-space: nowrap;
-  }
-
-  .pagination {
-    padding: 8px 8px 4px;
-  }
-
-  .page-title {
-    font-size: 20px;
-  }
-
-  .page-content {
-    padding: 16px 12px;
+    padding: 9px 4px;
   }
 }
 

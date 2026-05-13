@@ -2189,7 +2189,15 @@ async function saveEditStudent() {
   const record = modal?._record;
   if (!record?.id) { showToast('Student record not found.', 'error'); return; }
 
-  const rfid = document.getElementById('editStudentRfid')?.value.trim() || '';
+  const rfid         = document.getElementById('editStudentRfid')?.value.trim() || '';
+  const originalRfid = (record.rfid_uid && record.rfid_uid !== '-') ? record.rfid_uid.trim() : '';
+
+  if (rfid === originalRfid) {
+    showToast('No changes detected.', 'info');
+    closeEditStudentModal();
+    return;
+  }
+
   try {
     const endpoint = getEndpoint(tableState.table) || '../../controllers/students.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
@@ -2382,7 +2390,15 @@ async function saveEditEmployee() {
   const record = modal?._record;
   if (!record?.id) { showToast('Employee record not found.', 'error'); return; }
 
-  const rfid = document.getElementById('editEmployeeRfid')?.value.trim() || '';
+  const rfid         = document.getElementById('editEmployeeRfid')?.value.trim() || '';
+  const originalRfid = (record.rfid_uid && record.rfid_uid !== '-') ? record.rfid_uid.trim() : '';
+
+  if (rfid === originalRfid) {
+    showToast('No changes detected.', 'info');
+    closeEditEmployeeModal();
+    return;
+  }
+
   try {
     const endpoint = getEndpoint(tableState.table) || '../../controllers/employees.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
