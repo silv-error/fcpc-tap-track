@@ -25,7 +25,7 @@ class AttendanceService:
     @staticmethod
     def format_full_name(person: Optional[Dict]) -> str:
         if not person:
-            return "Unknown"
+            return "Unregistered"
 
         last_name = person.get("last_name") or ""
         first_name = person.get("first_name") or ""
@@ -144,7 +144,7 @@ class AttendanceService:
 
         person = None
         person_type = None
-        full_name = f"Unknown ({uid})"
+        full_name = f"Unregistered ({uid})"
 
         if person_data:
             person_type = person_data["person_type"]
