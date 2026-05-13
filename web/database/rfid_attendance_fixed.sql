@@ -159,21 +159,46 @@ COLLATE=utf8mb4_general_ci;
 
 CREATE TABLE `attendance_logs` (
     `id` INT(11) NOT NULL AUTO_INCREMENT,
+
+    -- NEW
+    `rfid_uid` VARCHAR(255) NOT NULL,
+
     `student_id` INT(11) DEFAULT NULL,
     `employee_id` INT(11) DEFAULT NULL,
+
+    -- NEW
+    `registration_status` ENUM('registered', 'unregistered')
+    NOT NULL DEFAULT 'unregistered',
+
     `log_date` DATE NOT NULL,
     `time_in` TIME NOT NULL,
     `time_out` TIME DEFAULT NULL,
+
     `status` ENUM('Timed In', 'Timed Out') NOT NULL,
+
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     PRIMARY KEY (`id`),
     KEY `student_id` (`student_id`),
-    KEY `employee_id` (`employee_id`)
+    KEY `employee_id` (`employee_id`),
+    KEY `rfid_uid` (`rfid_uid`)
 ) ENGINE=InnoDB
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_general_ci;
+
+
+ALTER TABLE `attendance_logs`
+ADD CONSTRAINT `fk_attendance_student`
+FOREIGN KEY (`student_id`) REFERENCES `students`(`id`)
+ON DELETE SET NULL
+ON UPDATE CASCADE;
+
+ALTER TABLE `attendance_logs`
+ADD CONSTRAINT `fk_attendance_employee`
+FOREIGN KEY (`employee_id`) REFERENCES `employees`(`id`)
+ON DELETE SET NULL
+ON UPDATE CASCADE;
 
 -- ============================================
 -- Insert Sample Employees
@@ -215,18 +240,6 @@ VALUES
 -- Add Foreign Keys AFTER Tables Exist
 -- ============================================
 
-ALTER TABLE `attendance_logs`
-ADD CONSTRAINT `fk_attendance_student`
-FOREIGN KEY (`student_id`) REFERENCES `students`(`id`)
-ON DELETE SET NULL
-ON UPDATE CASCADE;
-
-ALTER TABLE `attendance_logs`
-ADD CONSTRAINT `fk_attendance_employee`
-FOREIGN KEY (`employee_id`) REFERENCES `employees`(`id`)
-ON DELETE SET NULL
-ON UPDATE CASCADE;
-
 ALTER TABLE `rfid_uid_buffer`
 ADD CONSTRAINT `fk_rfid_uid_buffer_student`
 FOREIGN KEY (`used_by_student_id`) REFERENCES `students`(`id`)
@@ -248,4 +261,3 @@ SET FOREIGN_KEY_CHECKS = 1;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-```

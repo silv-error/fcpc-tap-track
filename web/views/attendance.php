@@ -4,11 +4,11 @@ require_once __DIR__ . '/../config/session.php';
 session_start();
 
 if (empty($_SESSION['user_id'])) {
-    header('Location: index.php');
+  header('Location: login.php');
     exit;
 }
 
-require_once __DIR__ . '/../api/csrf.php';
+require_once __DIR__ . '/../controllers/csrf.php';
 ?>
 
 <!DOCTYPE html>
@@ -123,7 +123,7 @@ require_once __DIR__ . '/../api/csrf.php';
             type="text"
             id="searchInput"
             class="filter-input"
-            placeholder="Search by Name/ID"
+            placeholder="Search by Name/RFID UID"
           />
         </div>
 
@@ -133,6 +133,15 @@ require_once __DIR__ . '/../api/csrf.php';
             <option value="all">All</option>
             <option value="Student">Student</option>
             <option value="Employee">Employee</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="statusSelect">Status</label>
+          <select id="statusSelect" class="filter-select">
+            <option value="all">All</option>
+            <option value="Registered">Registered</option>
+            <option value="Unregistered">Unregistered</option>
           </select>
         </div>
 
@@ -161,12 +170,13 @@ require_once __DIR__ . '/../api/csrf.php';
 
       <!-- Table -->
       <div class="table-wrapper">
-        <table class="data-table" data-endpoint="../api/attendance.php" data-table-type="attendance">
+        <table class="data-table" data-endpoint="../controllers/attendance.php" data-table-type="attendance">
           <thead>
             <tr>
               <th>Date</th>
-              <th>ID</th>
+              <th>RFID UID</th>
               <th>Name</th>
+              <th>Status</th>
               <th>Time In</th>
               <th>Time Out</th>
             </tr>

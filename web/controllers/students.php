@@ -59,6 +59,10 @@ function handle_get(mysqli $con): void
             strand,
             department,
             rfid_uid,
+            CASE
+                WHEN rfid_uid IS NOT NULL AND rfid_uid <> '' THEN 'Registered'
+                ELSE 'Unregistered'
+            END AS status,
             is_active,
             created_at,
             updated_at
@@ -86,6 +90,7 @@ function handle_get(mysqli $con): void
                 'year_level' => $student['year_level'] ?: '-',
                 'strand'     => $student['strand']     ?: '-',
                 'department' => $student['department'] ?: '-',
+                'status'     => $student['status'],
                 'is_active'  => (bool) $student['is_active'],
                 'created_at' => $student['created_at'],
                 'updated_at' => $student['updated_at'],

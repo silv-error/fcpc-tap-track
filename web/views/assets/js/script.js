@@ -316,12 +316,13 @@ function buildRowModel(pageType, record) {
         cells: [
           escapeText(record.student_number),
           escapeText(record.rfid_uid),
+          escapeText(record.status || (record.rfid_uid && record.rfid_uid !== '-' ? 'registered' : 'unregistered')),
           escapeText(record.name),
           escapeText(record.program),
           escapeText(record.year_level),
           escapeText(record.department),
         ],
-        searchText: [record.student_number, record.rfid_uid, record.name, record.program, record.year_level, record.department, record.strand].join(' ').toLowerCase(),
+        searchText: [record.student_number, record.rfid_uid, record.status, record.name, record.program, record.year_level, record.department, record.strand].join(' ').toLowerCase(),
         department: escapeText(record.department),
         yearLevel:  escapeText(record.year_level),
         program:    escapeText(record.program),
@@ -336,11 +337,12 @@ function buildRowModel(pageType, record) {
         cells: [
           escapeText(record.employee_number),
           escapeText(record.rfid_uid),
+          escapeText(record.status || (record.rfid_uid && record.rfid_uid !== '-' ? 'registered' : 'unregistered')),
           escapeText(record.name),
           escapeText(record.position),
           escapeText(record.department),
         ],
-        searchText: [record.employee_number, record.rfid_uid, record.name, record.position, record.department].join(' ').toLowerCase(),
+        searchText: [record.employee_number, record.rfid_uid, record.status, record.name, record.position, record.department].join(' ').toLowerCase(),
         department: escapeText(record.department),
         position:   escapeText(record.position),
         typeValue:  '',
@@ -351,17 +353,19 @@ function buildRowModel(pageType, record) {
       return {
         cells: [
           escapeText(record.log_date),
-          escapeText(record.reference_number),
+          escapeText(record.rfid_uid),
           escapeText(record.name),
+          escapeText(record.registration_status || 'Unregistered'),
           formatTime(record.time_in),
           formatTime(record.time_out),
         ],
-        searchText: [record.reference_number, record.name, record.department, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
+        searchText: [record.rfid_uid, record.name, record.department, record.registration_status, record.status, record.record_type, record.log_date].join(' ').toLowerCase(),
         department: escapeText(record.department),
         program:    escapeText(record.program || ''),
         yearLevel:  escapeText(record.year_level || ''),
         strand:     escapeText(record.strand || ''),
         category:   escapeText(record.category || ''),
+        statusValue: escapeText(record.registration_status || 'Unregistered'),
         typeValue:  escapeText(record.record_type),
         dateValue:  normalizeDate(record.log_date),
       };
@@ -738,6 +742,7 @@ function applyFilters(resetPage = true) {
   const search     = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
   const type       = (document.getElementById('typeSelect')?.value || 'all').toLowerCase();
   const date       = normalizeDate(document.getElementById('dateInput')?.value || '');
+  const status     = (document.getElementById('statusSelect')?.value || 'all').toLowerCase();
   const dept       = (document.getElementById('departmentSelect')?.value || 'all').toLowerCase();
   const category   = (document.getElementById('categorySelect')?.value || 'all').toLowerCase();
   const yearLevel  = (document.getElementById('yearLevelSelect')?.value || 'all').toLowerCase();
@@ -750,6 +755,10 @@ function applyFilters(resetPage = true) {
     if (search && !model.searchText.includes(search)) return false;
     if (type !== 'all' && model.typeValue.toLowerCase() !== type) return false;
     if (date && model.dateValue !== date) return false;
+
+    if (tableState.pageType === 'attendance') {
+      if (status !== 'all' && (model.statusValue || '').toLowerCase() !== status) return false;
+    }
 
     if (tableState.pageType === 'students') {
       if (category !== 'all' && model.category.toLowerCase() !== category) return false;
@@ -965,7 +974,7 @@ async function handleLogin(e) {
   if (btn) { btn.disabled = true; btn.textContent = 'Logging in…'; }
 
   try {
-    const res  = await fetch('login.php', {
+    const res  = await fetch('../controllers/login.php', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body:    JSON.stringify({ email, password }),
@@ -1048,11 +1057,11 @@ function handleLogout() {
 
   const confirmHandler = async () => {
     try {
-      await fetch('logout.php', { method: 'POST', headers: { 'X-CSRF-Token': getCsrfToken(), 'Accept': 'application/json' } });
+      await fetch('../controllers/logout.php', { method: 'POST', headers: { 'X-CSRF-Token': getCsrfToken(), 'Accept': 'application/json' } });
     } catch (e) {
       console.warn('Logout request failed:', e);
     } finally {
-      navigateWithTransition('index.php');
+      navigateWithTransition('login.php');
     }
   };
 
@@ -1088,18 +1097,18 @@ function getExportHeadersAndRows(pageType, rows) {
   switch (pageType) {
     case 'students':
       return {
-        headers: ['Student No.', 'RFID UID', 'Name', 'Program', 'Year Level', 'Department'],
-        rows: rows.map((r) => [escapeText(r.student_number), escapeText(r.rfid_uid), escapeText(r.name), escapeText(r.program), escapeText(r.year_level), escapeText(r.department)]),
+        headers: ['Student No.', 'RFID UID', 'Status', 'Name', 'Program', 'Year Level', 'Department'],
+        rows: rows.map((r) => [escapeText(r.student_number), escapeText(r.rfid_uid), escapeText(r.status || 'unregistered'), escapeText(r.name), escapeText(r.program), escapeText(r.year_level), escapeText(r.department)]),
       };
     case 'employees':
       return {
-        headers: ['Employee No.', 'RFID UID', 'Name', 'Position', 'Department'],
-        rows: rows.map((r) => [escapeText(r.employee_number), escapeText(r.rfid_uid), escapeText(r.name), escapeText(r.position), escapeText(r.department)]),
+        headers: ['Employee No.', 'RFID UID', 'Status', 'Name', 'Position', 'Department'],
+        rows: rows.map((r) => [escapeText(r.employee_number), escapeText(r.rfid_uid), escapeText(r.status || 'unregistered'), escapeText(r.name), escapeText(r.position), escapeText(r.department)]),
       };
     case 'attendance':
       return {
-        headers: ['Date', 'ID', 'Name', 'Time In', 'Time Out'],
-        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.reference_number), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
+        headers: ['Date', 'RFID UID', 'Status', 'Name', 'Time In', 'Time Out'],
+        rows: rows.map((r) => [escapeText(r.log_date), escapeText(r.rfid_uid), escapeText(r.registration_status || 'Unregistered'), escapeText(r.name), escapeText(r.time_in), escapeText(r.time_out)]),
       };
     default:
       return { headers: [], rows: [] };
@@ -1132,15 +1141,14 @@ function getExportSortValue(pageType, record, sortKey) {
 
 function getExportModalBody(pageType, rows) {
   const optionsFromRows = (field, allLabel) => {
-    const uniqueValues = getUniqueFieldValues(rows, field);
-    return [`<option value="all">${allLabel}</option>`, ...uniqueValues.map((v) => `<option value="${v.replace(/"/g, '&quot;')}">${v}</option>`)].join('');
+    const uniqueValues = [...new Set(rows.map((row) => escapeText(row?.[field])).filter((value) => value && value !== '-'))].sort((a, b) => a.localeCompare(b));
+    return [`<option value="all">${allLabel}</option>`, ...uniqueValues.map((value) => `<option value="${value.replace(/"/g, '&quot;')}">${value}</option>`)].join('');
   };
 
   if (pageType === 'students') {
     return `
       <div class="export-body-grid">
         <div class="export-field export-field-full" style="position:relative;">
-          <label for="exportSearchInput">Search</label>
           <input id="exportSearchInput" type="text" class="export-control" placeholder="Enter Name or Student Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
           <div id="exportSearchResults" style="position:absolute;left:0;right:0;top:100%;margin-top:6px;border:1px solid #d0d7de;border-radius:8px;max-height:220px;overflow-y:auto;display:none;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,0.12);z-index:50;"></div>
         </div>
@@ -1260,7 +1268,7 @@ function getExportModalBody(pageType, rows) {
       <div class="export-body-grid">
         <div class="export-field export-field-full" style="position:relative;">
           <label for="exportSearchInput">Search</label>
-          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or ID Number" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
+          <input id="exportSearchInput" type="text" class="export-control" placeholder="Search by Name or RFID UID" autocomplete="off" oninput="onExportSearchInput()" onfocus="onExportSearchInput()" />
           <div id="exportSearchResults" style="position:absolute;left:0;right:0;top:100%;margin-top:6px;border:1px solid #d0d7de;border-radius:8px;max-height:220px;overflow-y:auto;display:none;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,0.12);z-index:50;"></div>
         </div>
         <div class="export-section-label export-field-full">Filter By (Date Range)</div>
@@ -1272,23 +1280,31 @@ function getExportModalBody(pageType, rows) {
           <label for="exportDateTo">To</label>
           <input id="exportDateTo" type="date" class="export-control" />
         </div>
-        <div class="export-field export-field-full">
+        <div class="export-field">
           <label>Type</label>
-          <div class="export-checkbox-row">
-            ${['All', 'Student', 'Employee'].map((v) => `
-              <label class="export-checkbox">
-                <input type="checkbox" name="exportUserType" value="${v}" onchange="updateAttendanceTypeFilters()" />
-                <span>${v}</span>
-              </label>`).join('')}
-          </div>
+          <select id="exportUserTypeSelect" class="export-control export-select" onchange="updateAttendanceTypeFilters(this.value)">
+            <option value="all">All</option>
+            <option value="student">Student</option>
+            <option value="employee">Employee</option>
+          </select>
         </div>
+
+        <div class="export-field">
+          <label for="exportStatusSelect">Status</label>
+          <select id="exportStatusSelect" class="export-control export-select">
+            <option value="all">All</option>
+            <option value="registered">Registered</option>
+            <option value="unregistered">Unregistered</option>
+          </select>
+        </div>
+
         <div id="attendanceDynamicFilters" class="export-field export-field-full"></div>
         <div class="export-section-label export-field-full">Sort By</div>
         <div class="export-field">
           <label for="exportPrimarySort">Primary Sort</label>
           <select id="exportPrimarySort" class="export-control export-select">
             <option value="log_date">Date</option>
-            <option value="reference_number">ID Number</option>
+            <option value="reference_number">RFID UID</option>
             <option value="name">Name</option>
             <option value="type">Type</option>
           </select>
@@ -1394,10 +1410,15 @@ function updateAttendanceTypeFilters() {
   const container = document.getElementById('attendanceDynamicFilters');
   if (!container) return;
 
-  const checked = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value.toLowerCase());
+  const selectedType = (arguments[0] || document.getElementById('exportUserTypeSelect')?.value || 'all').toLowerCase();
   container.innerHTML = '';
 
-  if (checked.includes('employee')) {
+  if (selectedType === 'all') {
+    container.innerHTML = '<div class="export-filter-status" style="font-size:12px;color:#777;">Choose Student or Employee to show additional filters.</div>';
+    return;
+  }
+
+  if (selectedType === 'employee') {
     container.insertAdjacentHTML('beforeend', `
       <div class="export-section-label export-field-full">Employee Filters</div>
       <div class="export-field">
@@ -1409,7 +1430,7 @@ function updateAttendanceTypeFilters() {
       </div>`);
   }
 
-  if (checked.includes('student')) {
+  if (selectedType === 'student') {
     container.insertAdjacentHTML('beforeend', getStudentFiltersFragment());
     updateYearLevelOptions(document.getElementById('exportCategorySelect')?.value || 'all');
     updateExportFiltersForCategory(document.getElementById('exportCategorySelect')?.value || 'all');
@@ -1431,6 +1452,10 @@ function updateExportFiltersForCategory(category) {
 
   const enableSelect  = (el) => { if (el) el.disabled = false; };
   const disableSelect = (el) => { if (el) { el.disabled = true; el.value = 'all'; } };
+  const showFilter = (wrapper, visible) => {
+    if (!wrapper) return;
+    wrapper.style.display = visible ? '' : 'none';
+  };
 
   const updateFilterStatus = (wrapper, enabled, message = '') => {
     if (!wrapper) return;
@@ -1445,6 +1470,11 @@ function updateExportFiltersForCategory(category) {
   disableSelect(programSelect);
   disableSelect(yearLevelSelect);
   disableSelect(strandSelect);
+
+  showFilter(filters.department, true);
+  showFilter(filters.program, true);
+  showFilter(filters.yearLevel, true);
+  showFilter(filters.strand, true);
 
   updateYearLevelOptions(category);
 
@@ -1461,8 +1491,9 @@ function updateExportFiltersForCategory(category) {
     updateFilterStatus(filters.strand,     true);
 
   } else if (category === 'Basic Education') {
-    enableSelect(departmentSelect);
+    showFilter(filters.department, false);
     setSelectOptions(programSelect, getStudentProgramOptions('Basic Education'), 'All Programs');
+    showFilter(filters.program, false);
     disableSelect(programSelect);
     enableSelect(yearLevelSelect);
 
@@ -1472,9 +1503,11 @@ function updateExportFiltersForCategory(category) {
       if (applicable) {
         setSelectOptions(strandSelect, STRAND_OPTIONS, 'All Strands');
         enableSelect(strandSelect);
+        showFilter(filters.strand, true);
         updateFilterStatus(filters.strand, true);
       } else {
         disableSelect(strandSelect);
+        showFilter(filters.strand, false);
         updateFilterStatus(filters.strand, false, 'Available for Grade 11/12 only');
       }
     };
@@ -1482,7 +1515,7 @@ function updateExportFiltersForCategory(category) {
     updateStrandAvailability();
     if (yearLevelSelect) yearLevelSelect.onchange = updateStrandAvailability;
 
-    updateFilterStatus(filters.department, true);
+    updateFilterStatus(filters.department, false, 'Not applicable for Basic Education');
     updateFilterStatus(filters.program,    false, 'Not applicable for Basic Education');
     updateFilterStatus(filters.yearLevel,  true);
 
@@ -1492,6 +1525,7 @@ function updateExportFiltersForCategory(category) {
     enableSelect(programSelect);
     enableSelect(yearLevelSelect);
     disableSelect(strandSelect);
+    showFilter(filters.strand, false);
     if (yearLevelSelect) yearLevelSelect.onchange = null;
     updateFilterStatus(filters.department, true);
     updateFilterStatus(filters.program,    true);
@@ -1504,6 +1538,8 @@ function updateExportFiltersForCategory(category) {
     enableSelect(programSelect);
     disableSelect(yearLevelSelect);
     disableSelect(strandSelect);
+    showFilter(filters.yearLevel, false);
+    showFilter(filters.strand, false);
     if (yearLevelSelect) yearLevelSelect.onchange = null;
     updateFilterStatus(filters.department, true);
     updateFilterStatus(filters.program,    true);
@@ -1542,11 +1578,11 @@ function getExportSearchCandidate(record, pageType) {
   }
   if (pageType === 'attendance') {
     return {
-      id:         escapeText(record.reference_number),
+      id:         escapeText(record.rfid_uid),
       name:       escapeText(record.name),
       department: escapeText(record.department),
-      display:    `${escapeText(record.reference_number)} — ${escapeText(record.name)}`,
-      searchText: [record.reference_number, record.name, record.department, record.record_type, record.log_date].join(' ').toLowerCase(),
+      display:    `${escapeText(record.rfid_uid)} — ${escapeText(record.name)}`,
+      searchText: [record.rfid_uid, record.name, record.department, record.registration_status, record.record_type, record.log_date].join(' ').toLowerCase(),
     };
   }
   return null;
@@ -1639,13 +1675,17 @@ function collectExportRows(pageType) {
     if (pageType === 'attendance') {
       const dateFrom      = normalizeDate(document.getElementById('exportDateFrom')?.value || '');
       const dateTo        = normalizeDate(document.getElementById('exportDateTo')?.value   || '');
-      const selectedTypes = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value.toLowerCase());
-      const isAllSelected = selectedTypes.includes('all') || !selectedTypes.length;
+      const statusVal     = (document.getElementById('exportStatusSelect')?.value || 'all').toLowerCase();
+        const selectedType  = (document.getElementById('exportUserTypeSelect')?.value || 'all').toLowerCase();
       const modelType     = (model.typeValue || '').toLowerCase();
 
       if (dateFrom && model.dateValue < dateFrom) return false;
       if (dateTo   && model.dateValue > dateTo)   return false;
-      if (!isAllSelected && !selectedTypes.includes(modelType)) return false;
+      if (statusVal !== 'all' && (model.statusValue || '').toLowerCase() !== statusVal) return false;
+
+        if (selectedType !== 'all' && modelType !== selectedType) {
+        return false;
+      }
 
       const empDeptVal     = (document.getElementById('exportDepartmentSelect')?.value  || 'all').toLowerCase();
       const stuCategoryVal = (document.getElementById('exportCategorySelect')?.value    || 'all').toLowerCase();
@@ -1698,12 +1738,19 @@ async function handleExport() {
     filters.search     = (document.getElementById('exportSearchInput')?.value || '').trim();
     filters.dateFrom   = document.getElementById('exportDateFrom')?.value || '';
     filters.dateTo     = document.getElementById('exportDateTo')?.value   || '';
-    filters.userTypes  = [...document.querySelectorAll('input[name="exportUserType"]:checked')].map((i) => i.value);
+    const selectedType = (document.getElementById('exportUserTypeSelect')?.value || 'all').toLowerCase();
+    filters.userTypes  = [selectedType];
+    filters.status     = document.getElementById('exportStatusSelect')?.value || 'all';
     filters.department = document.getElementById('exportDepartmentSelect')?.value || 'all';
     filters.category   = document.getElementById('exportCategorySelect')?.value   || 'all';
     filters.program    = document.getElementById('exportProgramSelect')?.value     || 'all';
     filters.yearLevel  = document.getElementById('exportYearLevelSelect')?.value   || 'all';
     filters.strand     = document.getElementById('exportStrandSelect')?.value      || 'all';
+    filters.primarySort = document.getElementById('exportPrimarySort')?.value || 'log_date';
+    filters.sortOrder   = document.getElementById('exportSortOrder')?.value   || 'desc';
+  } else {
+    filters.primarySort = document.getElementById('exportPrimarySort')?.value || 'last_name';
+    filters.sortOrder   = document.getElementById('exportSortOrder')?.value   || 'asc';
   }
 
   const formData = new FormData();
@@ -1711,7 +1758,7 @@ async function handleExport() {
   formData.append('filters', JSON.stringify(filters));
 
   try {
-    const response = await fetch('../api/export.php', { method: 'POST', body: formData });
+    const response = await fetch('../controllers/export.php', { method: 'POST', body: formData });
     const contentType = response.headers.get('content-type') || '';
     if (!response.ok || !contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
       throw new Error('Export failed. Please try again.');
@@ -2124,7 +2171,7 @@ async function saveEditStudent() {
 
   const rfid = document.getElementById('editStudentRfid')?.value.trim() || '';
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/students.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/students.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
     showToast('Student RFID updated successfully.', 'success');
     closeEditStudentModal();
@@ -2230,7 +2277,7 @@ async function saveAddStudent() {
   }
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/students.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/students.php';
     await apiRequest(endpoint, 'POST', body);
     showToast('Student added successfully.', 'success');
     closeAddStudentModal();
@@ -2317,7 +2364,7 @@ async function saveEditEmployee() {
 
   const rfid = document.getElementById('editEmployeeRfid')?.value.trim() || '';
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/employees.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/employees.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
     showToast('Employee RFID updated successfully.', 'success');
     closeEditEmployeeModal();
@@ -2357,7 +2404,7 @@ async function saveAddEmployee() {
   }
 
   try {
-    const endpoint = getEndpoint(tableState.table) || '../../api/employees.php';
+    const endpoint = getEndpoint(tableState.table) || '../../controllers/employees.php';
     await apiRequest(endpoint, 'POST', body);
     showToast('Employee added successfully.', 'success');
     closeAddEmployeeModal();
@@ -2388,7 +2435,7 @@ async function handleImportFile(file) {
   if (file.size > maxSize)         { showToast('Import failed: file is larger than 25 MB.', 'error'); return; }
 
   const entity   = importState.entity;
-  const endpoint = getEndpoint(tableState.table) || `../../api/${entity}.php`;
+  const endpoint = getEndpoint(tableState.table) || `../../controllers/${entity}.php`;
   const formData = new FormData();
   formData.append('file', file);
 
@@ -2481,7 +2528,7 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
   let currentRfidContext  = null;
   let lastValidatedRfid   = null;
 
-  const RFID_API_URL = '/fcpc-tap-track/web/api/students.php?action=latest-rfid';
+  const RFID_API_URL = '/fcpc-tap-track/web/controllers/students.php?action=latest-rfid';
 
   (async function initRfidBufferId() {
     try {
@@ -2526,7 +2573,7 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
     lastValidatedRfid = rfidUid;
 
     const endpoint = moduleType.includes('student') ? 'students.php' : 'employees.php';
-    const apiUrl = `../api/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
+    const apiUrl = `../controllers/${endpoint}?action=validate-rfid&rfid_uid=${encodeURIComponent(rfidUid)}&exclude_id=${recordId}`;
 
     try {
       const response = await fetch(apiUrl, { headers: { Accept: 'application/json' } });

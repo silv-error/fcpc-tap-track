@@ -3,79 +3,107 @@
 require_once __DIR__ . '/../config/session.php';
 session_start();
 
-require_once __DIR__ . '/../config/connection.php';
-require_once __DIR__ . '/../api/helpers.php';
-require_once __DIR__ . '/../api/csrf.php';
-
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    json_response(['success' => false, 'message' => 'Method not allowed.'], 405);
-}
-
-// Validate CSRF token for login
-validate_csrf_token();
-
-// Already logged in — nothing to do
+// If already logged in, redirect to users page
 if (!empty($_SESSION['user_id'])) {
-    json_response(['success' => true, 'message' => 'Already authenticated.']);
+  header('Location: users.php');
+  exit;
 }
 
-$body = json_decode(file_get_contents('php://input'), true) ?? [];
+require_once __DIR__ . '/../controllers/csrf.php';
+?>
 
-$identifier = trim($body['email'] ?? '');   // accepts username or email
-$password   = $body['password']  ?? '';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Login | FCPC Attendance Tracker</title>
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="shortcut icon" type="image/x-icon" href="images/favicon.ico" />
+  <link rel="apple-touch-icon" href="images/favicon.ico" />
+  <meta name="theme-color" content="#ffffff" />
+  <meta name="csrf-token" content="<?= htmlspecialchars(generate_csrf_token()) ?>">
+</head>
+<body>
 
-if ($identifier === '' || $password === '') {
-    json_response(['success' => false, 'message' => 'Email/username and password are required.'], 422);
-}
+<!-- Page Transition Overlay -->
+<div class="page-transition-overlay" id="pageTransitionOverlay"></div>
 
-$stmt = mysqli_prepare($con, "
-    SELECT id, username, first_name, last_name, role, password_hash, is_active
-    FROM users
-    WHERE username = ? OR email = ?
-    LIMIT 1
-");
+<div class="login-page">
 
-if (!$stmt) {
-    json_response(['success' => false, 'message' => mysqli_error($con)], 500);
-}
+  <!-- LEFT: Login Card -->
+  <div class="login-left">
+    <div class="login-card">
 
-mysqli_stmt_bind_param($stmt, 'ss', $identifier, $identifier);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
+      <!-- Logo -->
+      <div class="login-logo">
+        <!-- FCPC Logo Image -->
+        <img src="images/fcpc-logo.png" alt="FCPC Logo" class="logo-icon" />
 
-if (!$result) {
-    json_response(['success' => false, 'message' => mysqli_error($con)], 500);
-}
+        <div class="login-logo-text">
+          <h1>First City Providential College</h1>
+          <p>Attendance Tracker</p>
+        </div>
+      </div>
 
-$user = mysqli_fetch_assoc($result);
+      <!-- Form -->
+      <form id="loginForm" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <input
+            type="text"
+            id="email"
+            placeholder="Email/User"
+            autocomplete="username"
+          />
+        </div>
 
-// Use a constant-time comparison path whether the user exists or not
-// to avoid timing-based user enumeration.
-$dummyHash = '$2y$12$invalidsaltinvalidsaltininvalid';
-$hash      = $user['password_hash'] ?? $dummyHash;
+        <div class="form-group">
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="password"
+              placeholder="Password"
+              autocomplete="current-password"
+            />
+            <button
+              type="button"
+              class="toggle-password"
+              onclick="togglePassword()"
+              aria-label="Toggle password visibility"
+            >
+              <!-- Eye-off icon (default: hidden) -->
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-if (!$user || !password_verify($password, $hash)) {
-    json_response(['success' => false, 'message' => 'Invalid credentials.'], 401);
-}
+        <button type="submit" class="btn-login">Log in</button>
 
-if (!(bool) $user['is_active']) {
-    json_response(['success' => false, 'message' => 'Your account is inactive. Contact an administrator.'], 403);
-}
+        <div id="loginMessage" class="login-message" role="alert" aria-live="polite" hidden></div>
 
-// Regenerate session ID on login to prevent session fixation
-session_regenerate_id(true);
+        <div class="remember-row">
+          <input type="checkbox" id="rememberMe" />
+          <label for="rememberMe">Remember Me</label>
+        </div>
+      </form>
 
-$_SESSION['user_id']   = (int) $user['id'];
-$_SESSION['username']  = $user['username'];
-$_SESSION['role']      = $user['role'];
-$_SESSION['full_name'] = $user['first_name'] . ' ' . $user['last_name'];
+      <a class="forgot-link" href="#">Forgot Password</a>
+    </div>
+  </div>
 
-json_response([
-    'success' => true,
-    'message' => 'Login successful.',
-    'data'    => [
-        'username'  => $user['username'],
-        'role'      => $user['role'],
-        'full_name' => $_SESSION['full_name'],
-    ],
-]);
+  <!-- RIGHT: Decorative panel -->
+  <div class="login-right">
+    <div class="login-right-bg"></div>
+  </div>
+
+</div>
+
+<script src="assets/js/script.js"></script>
+</body>
+</html>

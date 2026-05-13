@@ -113,6 +113,10 @@ function handle_get(mysqli $con): void
             department,
             position,
             rfid_uid,
+            CASE
+                WHEN rfid_uid IS NOT NULL AND rfid_uid <> '' THEN 'Registered'
+                ELSE 'Unregistered'
+            END AS status,
             is_active,
             created_at,
             updated_at
@@ -137,6 +141,7 @@ function handle_get(mysqli $con): void
                 ),
                 'position'   => $employee['position']  ?: '-',
                 'department' => $employee['department'] ?: '-',
+                'status'     => $employee['status'],
                 'is_active'  => (bool) $employee['is_active'],
                 'created_at' => $employee['created_at'],
                 'updated_at' => $employee['updated_at'],
