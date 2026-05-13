@@ -159,7 +159,7 @@ require_once __DIR__ . '/../controllers/csrf.php';
               <th>Employee No.</th>
               <th>RFID UID</th>
               <th>Status</th>
-              <th>Name</th>
+              <th>Employee Name</th>
               <th>Position</th>
               <th>Department</th>
               <th>Actions</th>

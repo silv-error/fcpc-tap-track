@@ -513,8 +513,11 @@ function renderCurrentPage() {
       actionWrap.className = 'row-actions';
 
       const viewBtn = document.createElement('button');
-      viewBtn.className   = 'row-action-btn view';
-      viewBtn.textContent = 'View';
+      viewBtn.className = 'row-action-btn view';
+      viewBtn.setAttribute('aria-label', 'View');
+      viewBtn.title = 'View';
+      viewBtn.dataset.label = 'View';
+      viewBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="12" cy="12" r="3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></circle></svg>';
       viewBtn.onclick = (e) => {
         e.preventDefault();
         if (tableState.pageType === 'students')       openViewStudentModal(record);
@@ -523,8 +526,11 @@ function renderCurrentPage() {
       };
 
       const editBtn = document.createElement('button');
-      editBtn.className   = 'row-action-btn edit';
-      editBtn.textContent = 'Edit';
+      editBtn.className = 'row-action-btn edit';
+      editBtn.setAttribute('aria-label', 'Edit');
+      editBtn.title = 'Edit';
+      editBtn.dataset.label = 'Edit';
+      editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 21v-3.75L14.06 6.19a2.21 2.21 0 0 1 3.13 0l0 0a2.21 2.21 0 0 1 0 3.13L6.19 21H3z" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M14 7l3 3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
       editBtn.onclick = (e) => {
         e.preventDefault();
         if (tableState.pageType === 'students')       openEditStudentModal(record);
@@ -1002,10 +1008,24 @@ async function handleLogin(e) {
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   if (!sidebar) return;
+  // On small screens, open sidebar as off-canvas drawer instead of collapsing
+  if (window.innerWidth <= 700) {
+    const isOpen = document.documentElement.classList.toggle('sidebar-open');
+    // show overlay to allow tapping outside to close
+    const overlay = document.getElementById('pageTransitionOverlay');
+    if (overlay) {
+      overlay.classList.toggle('active', isOpen);
+      overlay.onclick = () => { document.documentElement.classList.remove('sidebar-open'); overlay.classList.remove('active'); };
+    }
+    return;
+  }
+
   const isCollapsed = sidebar.classList.toggle('collapsed');
   document.documentElement.classList.toggle('sidebar-collapsed', isCollapsed);
   localStorage.setItem('sidebar-collapsed', isCollapsed ? '1' : '0');
 }
+
+window.toggleSidebar = toggleSidebar;
 
 function initLoadingSkeletons() {
   const wrappers = document.querySelectorAll('.table-wrapper');

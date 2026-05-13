@@ -173,7 +173,7 @@ require_once __DIR__ . '/../controllers/csrf.php';
               <th>Student No.</th>
               <th>RFID UID</th>
               <th>Status</th>
-              <th>Full Name</th>
+              <th>Student Name</th>
               <th>Program</th>
               <th>Year Level</th>
               <th>Department</th>
