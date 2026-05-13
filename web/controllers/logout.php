@@ -3,8 +3,8 @@
 require_once __DIR__ . '/../config/session.php';
 session_start();
 
-require_once __DIR__ . '/../api/csrf.php';
-require_once __DIR__ . '/../api/helpers.php';
+require_once __DIR__ . '/csrf.php';
+require_once __DIR__ . '/helpers.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_response(['success' => false, 'message' => 'Method not allowed.'], 405);

@@ -4,11 +4,11 @@ require_once __DIR__ . '/../config/session.php';
 session_start();
 
 if (empty($_SESSION['user_id'])) {
-    header('Location: index.php');
+  header('Location: login.php');
     exit;
 } 
 
-require_once __DIR__ . '/../api/csrf.php';
+require_once __DIR__ . '/../controllers/csrf.php';
 ?>
 
 <!DOCTYPE html>
@@ -131,7 +131,7 @@ require_once __DIR__ . '/../api/csrf.php';
           <div class="skeleton-row"></div><div class="skeleton-row"></div>
           <div class="skeleton-row"></div>
         </div>
-        <table class="data-table" data-endpoint="../api/users.php" data-table-type="users">
+        <table class="data-table" data-endpoint="../controllers/users.php" data-table-type="users">
           <thead>
             <tr>
               <th>Employee No.</th>
@@ -408,7 +408,7 @@ require_once __DIR__ . '/../api/csrf.php';
 
     _searchTimer = setTimeout(async () => {
       try {
-        const res  = await fetch(`../api/employees-search.php?q=${encodeURIComponent(q)}`);
+        const res  = await fetch(`../controllers/employees-search.php?q=${encodeURIComponent(q)}`);
         const json = await res.json();
 
         if (!json.success || json.data.length === 0) {
@@ -489,7 +489,7 @@ require_once __DIR__ . '/../api/csrf.php';
     btn.textContent = 'Saving…';
 
     try {
-      const res = await fetch('../api/users.php', {
+      const res = await fetch('../controllers/users.php', {
         method:  'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -591,7 +591,7 @@ require_once __DIR__ . '/../api/csrf.php';
     if (!role)     { showToast('Please select a role.', 'error'); return; }
 
     try {
-      const res = await fetch('../api/users.php', {
+      const res = await fetch('../controllers/users.php', {
         method:  'PATCH',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({

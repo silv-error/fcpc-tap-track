@@ -4,11 +4,11 @@ require_once __DIR__ . '/../config/session.php';
 session_start();
 
 if (empty($_SESSION['user_id'])) {
-    header('Location: index.php');
+  header('Location: login.php');
     exit;
 }
 
-require_once __DIR__ . '/../api/csrf.php';
+require_once __DIR__ . '/../controllers/csrf.php';
 ?>
 
 <!DOCTYPE html>
@@ -167,11 +167,12 @@ require_once __DIR__ . '/../api/csrf.php';
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table" data-endpoint="../api/students.php" data-table-type="students">
+        <table class="data-table" data-endpoint="../controllers/students.php" data-table-type="students">
           <thead>
             <tr>
               <th>Student No.</th>
               <th>RFID UID</th>
+              <th>Status</th>
               <th>Full Name</th>
               <th>Program</th>
               <th>Year Level</th>

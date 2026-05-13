@@ -65,8 +65,11 @@ ATTENDANCE_LOG_TABLE_SCHEMA = """
 CREATE TABLE IF NOT EXISTS attendance_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
 
+    rfid_uid TEXT NOT NULL,
     student_id INTEGER,
     employee_id INTEGER,
+
+    registration_status TEXT NOT NULL DEFAULT 'registered',
 
     log_date TEXT NOT NULL,
     time_in TEXT NOT NULL,
@@ -77,13 +80,7 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
     updated_at TEXT NOT NULL,
 
     FOREIGN KEY (student_id) REFERENCES students(id),
-    FOREIGN KEY (employee_id) REFERENCES employees(id),
-
-    CHECK (
-        (student_id IS NOT NULL AND employee_id IS NULL)
-        OR
-        (student_id IS NULL AND employee_id IS NOT NULL)
-    )
+    FOREIGN KEY (employee_id) REFERENCES employees(id)
 )
 """
 

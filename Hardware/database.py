@@ -287,24 +287,36 @@ class DatabaseManager:
 
     def get_active_attendance_log(
         self,
-        person_id: int,
-        person_type: str,
+        person_id: Optional[int] = None,
+        person_type: Optional[str] = None,
+        rfid_uid: Optional[str] = None,
     ) -> Optional[Dict]:
         today = self.current_date()
-        person_type = person_type.strip().capitalize()
+        normalized_uid = self.normalize_uid(rfid_uid) if rfid_uid else ''
 
-        if person_type == "Student":
-            column_name = "student_id"
-        elif person_type == "Employee":
-            column_name = "employee_id"
+        if normalized_uid:
+            query = """
+                SELECT *
+                FROM attendance_logs
+                WHERE rfid_uid = %s
+                AND log_date = %s
+                AND time_out IS NULL
+                ORDER BY id DESC
+                LIMIT 1
+            """
+            params = (normalized_uid, today)
         else:
-            raise ValueError("Invalid person type. Must be Student or Employee.")
+            if person_id is None or person_type is None:
+                raise ValueError("person_id and person_type are required unless rfid_uid is provided.")
 
-        connection = self.get_connection()
-        cursor = None
+            person_type = person_type.strip().capitalize()
 
-        try:
-            cursor = connection.cursor(dictionary=True)
+            if person_type == "Student":
+                column_name = "student_id"
+            elif person_type == "Employee":
+                column_name = "employee_id"
+            else:
+                raise ValueError("Invalid person type. Must be Student or Employee.")
 
             query = f"""
                 SELECT *
@@ -315,8 +327,15 @@ class DatabaseManager:
                 ORDER BY id DESC
                 LIMIT 1
             """
+            params = (person_id, today)
 
-            cursor.execute(query, (person_id, today))
+        connection = self.get_connection()
+        cursor = None
+
+        try:
+            cursor = connection.cursor(dictionary=True)
+
+            cursor.execute(query, params)
             return cursor.fetchone()
 
         except Error as error:
@@ -329,24 +348,35 @@ class DatabaseManager:
 
     def get_today_attendance_log(
         self,
-        person_id: int,
-        person_type: str,
+        person_id: Optional[int] = None,
+        person_type: Optional[str] = None,
+        rfid_uid: Optional[str] = None,
     ) -> Optional[Dict]:
         today = self.current_date()
-        person_type = person_type.strip().capitalize()
+        normalized_uid = self.normalize_uid(rfid_uid) if rfid_uid else ''
 
-        if person_type == "Student":
-            column_name = "student_id"
-        elif person_type == "Employee":
-            column_name = "employee_id"
+        if normalized_uid:
+            query = """
+                SELECT *
+                FROM attendance_logs
+                WHERE rfid_uid = %s
+                AND log_date = %s
+                ORDER BY id DESC
+                LIMIT 1
+            """
+            params = (normalized_uid, today)
         else:
-            raise ValueError("Invalid person type. Must be Student or Employee.")
+            if person_id is None or person_type is None:
+                raise ValueError("person_id and person_type are required unless rfid_uid is provided.")
 
-        connection = self.get_connection()
-        cursor = None
+            person_type = person_type.strip().capitalize()
 
-        try:
-            cursor = connection.cursor(dictionary=True)
+            if person_type == "Student":
+                column_name = "student_id"
+            elif person_type == "Employee":
+                column_name = "employee_id"
+            else:
+                raise ValueError("Invalid person type. Must be Student or Employee.")
 
             query = f"""
                 SELECT *
@@ -356,8 +386,15 @@ class DatabaseManager:
                 ORDER BY id DESC
                 LIMIT 1
             """
+            params = (person_id, today)
 
-            cursor.execute(query, (person_id, today))
+        connection = self.get_connection()
+        cursor = None
+
+        try:
+            cursor = connection.cursor(dictionary=True)
+
+            cursor.execute(query, params)
             return cursor.fetchone()
 
         except Error as error:
@@ -370,23 +407,31 @@ class DatabaseManager:
 
     def create_time_in_log(
         self,
-        person_id: int,
-        person_type: str,
+        person_id: Optional[int] = None,
+        person_type: Optional[str] = None,
+        rfid_uid: str = '',
+        registration_status: str = 'registered',
     ) -> str:
         now_datetime = self.current_datetime()
         today = self.current_date()
         current_time = self.current_time()
 
-        person_type = person_type.strip().capitalize()
+        normalized_status = registration_status.strip().lower()
+        if normalized_status not in {"registered", "unregistered"}:
+            raise ValueError("Invalid registration status. Must be registered or unregistered.")
 
-        if person_type == "Student":
-            student_id = person_id
-            employee_id = None
-        elif person_type == "Employee":
-            student_id = None
-            employee_id = person_id
-        else:
-            raise ValueError("Invalid person type. Must be Student or Employee.")
+        student_id = None
+        employee_id = None
+
+        if person_id is not None and person_type is not None:
+            person_type = person_type.strip().capitalize()
+
+            if person_type == "Student":
+                student_id = person_id
+            elif person_type == "Employee":
+                employee_id = person_id
+            else:
+                raise ValueError("Invalid person type. Must be Student or Employee.")
 
         connection = self.get_connection()
         cursor = None
@@ -394,11 +439,15 @@ class DatabaseManager:
         try:
             cursor = connection.cursor(dictionary=True)
 
+            normalized_uid = self.normalize_uid(rfid_uid)
+
             cursor.execute(
                 """
                 INSERT INTO attendance_logs (
+                    rfid_uid,
                     student_id,
                     employee_id,
+                    registration_status,
                     log_date,
                     time_in,
                     time_out,
@@ -406,11 +455,13 @@ class DatabaseManager:
                     created_at,
                     updated_at
                 )
-                VALUES (%s, %s, %s, %s, NULL, 'Timed In', %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, NULL, 'Timed In', %s, %s)
                 """,
                 (
+                    normalized_uid,
                     student_id,
                     employee_id,
+                    normalized_status,
                     today,
                     current_time,
                     now_datetime,

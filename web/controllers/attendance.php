@@ -12,8 +12,8 @@ require_once __DIR__ . '/auth_check.php';
 $sql = "
     SELECT
         a.id,
-        a.student_id,
-        a.employee_id,
+        a.rfid_uid,
+        a.registration_status,
         a.log_date,
         a.time_in,
         a.time_out,
@@ -22,9 +22,9 @@ $sql = "
         a.updated_at,
 
         CASE
-            WHEN a.student_id  IS NOT NULL THEN 'Student'
-            WHEN a.employee_id IS NOT NULL THEN 'Employee'
-            ELSE 'Unknown'
+            WHEN s.id IS NOT NULL THEN 'Student'
+            WHEN e.id IS NOT NULL THEN 'Employee'
+            ELSE 'Unregistered'
         END AS record_type,
 
         s.student_number  AS s_reference_number,
@@ -42,8 +42,8 @@ $sql = "
         e.department      AS e_department
 
     FROM attendance_logs a
-    LEFT JOIN students  s ON s.id = a.student_id
-    LEFT JOIN employees e ON e.id = a.employee_id
+    LEFT JOIN students  s ON UPPER(s.rfid_uid) = UPPER(a.rfid_uid)
+    LEFT JOIN employees e ON UPPER(e.rfid_uid) = UPPER(a.rfid_uid)
     ORDER BY a.log_date DESC, a.time_in DESC, a.id DESC
 ";
 
@@ -52,8 +52,11 @@ $logs = fetch_all_rows($con, $sql);
 json_response([
     'success' => true,
     'data'    => array_map(static function (array $log): array {
+        $rfid = trim((string) ($log['rfid_uid'] ?? ''));
+
         return [
             'id'               => (int) $log['id'],
+            'rfid_uid'         => $rfid !== '' ? $rfid : '-',
             'record_type'      => $log['record_type'],
             'reference_number' => resolve_reference_number($log),
             'name'             => resolve_display_name($log),
@@ -62,6 +65,7 @@ json_response([
             'time_in'          => $log['time_in'],
             'time_out'         => $log['time_out'] ?: '-',
             'status'           => $log['status'],
+            'registration_status' => resolve_registration_status($log),
             'created_at'       => $log['created_at'],
             'updated_at'       => $log['updated_at'],
         ];
