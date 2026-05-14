@@ -39,9 +39,19 @@ function handle_get(mysqli $con): void
     }
 
     if ($action === 'rfid-buffer-max-id') {
-        $result = mysqli_query($con, "SELECT COALESCE(MAX(id), 0) AS max_id FROM rfid_uid_buffer");
-        $row    = mysqli_fetch_assoc($result);
-        json_response(['success' => true, 'max_id' => (int) $row['max_id']]);
+        $stmt = mysqli_prepare($con, "SELECT COALESCE(MAX(id), 0) AS max_id FROM rfid_uid_buffer");
+
+        if (!$stmt || !mysqli_stmt_execute($stmt)) {
+            error_log('RFID buffer max-id query failed: ' . mysqli_error($con));
+            json_response(['success' => false, 'message' => 'A database error occurred.'], 500);
+        }
+
+        $result = mysqli_stmt_get_result($stmt);
+        $row    = $result ? mysqli_fetch_assoc($result) : null;
+        mysqli_stmt_close($stmt);
+        $maxId = (int) ($row['max_id'] ?? 0);
+
+        json_response(['success' => true, 'max_id' => $maxId]);
         return;
     }
 
@@ -103,9 +113,16 @@ function handle_get(mysqli $con): void
 
 function handle_get_latest_rfid_uid(mysqli $con): void
 {
-    $tableCheck = mysqli_query($con, "SHOW TABLES LIKE 'rfid_uid_buffer'");
+    $tableCheckStmt = mysqli_prepare($con, "SHOW TABLES LIKE 'rfid_uid_buffer'");
+    $tableExists = false;
 
-    if (!$tableCheck || mysqli_num_rows($tableCheck) === 0) {
+    if ($tableCheckStmt && mysqli_stmt_execute($tableCheckStmt)) {
+        $tableCheckResult = mysqli_stmt_get_result($tableCheckStmt);
+        $tableExists = $tableCheckResult && mysqli_num_rows($tableCheckResult) > 0;
+        mysqli_stmt_close($tableCheckStmt);
+    }
+
+    if (!$tableExists) {
         json_response(['success' => false, 'message' => 'RFID buffer table does not exist.'], 500);
     }
 

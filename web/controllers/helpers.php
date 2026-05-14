@@ -183,7 +183,27 @@ function resolve_department(array $row): string
 
 function fetch_all_rows(mysqli $con, string $sql): array
 {
-    $result = mysqli_query($con, $sql);
+    $stmt = mysqli_prepare($con, $sql);
+
+    if (!$stmt) {
+        error_log('fetch_all_rows prepare failed: ' . mysqli_error($con));
+        json_response([
+            'success' => false,
+            'message' => 'A database error occurred.',
+            'data'    => [],
+        ], 500);
+    }
+
+    if (!mysqli_stmt_execute($stmt)) {
+        error_log('fetch_all_rows execute failed: ' . mysqli_stmt_error($stmt));
+        json_response([
+            'success' => false,
+            'message' => 'A database error occurred.',
+            'data'    => [],
+        ], 500);
+    }
+
+    $result = mysqli_stmt_get_result($stmt);
 
     if (!$result) {
         error_log('fetch_all_rows failed: ' . mysqli_error($con));
@@ -198,6 +218,8 @@ function fetch_all_rows(mysqli $con, string $sql): array
     while ($row = mysqli_fetch_assoc($result)) {
         $rows[] = $row;
     }
+
+    mysqli_stmt_close($stmt);
 
     return $rows;
 }
