@@ -955,10 +955,11 @@ function togglePassword() {
 async function handleLogin(e) {
   if (e) e.preventDefault();
 
-  const email    = document.getElementById('email')?.value.trim();
-  const password = document.getElementById('password')?.value;
-  const btn      = document.querySelector('#loginForm .btn-login');
-  const message  = document.getElementById('loginMessage');
+  const email     = document.getElementById('email')?.value.trim();
+  const password  = document.getElementById('password')?.value;
+  const rememberMe = document.getElementById('rememberMe')?.checked ?? false;
+  const btn       = document.querySelector('#loginForm .btn-login');
+  const message   = document.getElementById('loginMessage');
 
   const showLoginMessage = (text, type = 'error') => {
     if (!message) return;
@@ -983,7 +984,7 @@ async function handleLogin(e) {
     const res  = await fetch('../controllers/login.php', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-      body:    JSON.stringify({ email, password }),
+      body:    JSON.stringify({ email, password, rememberMe }),
     });
 
     const contentType = res.headers.get('content-type') || '';

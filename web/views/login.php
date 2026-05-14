@@ -92,8 +92,6 @@ require_once __DIR__ . '/../controllers/csrf.php';
           <label for="rememberMe">Remember Me</label>
         </div>
       </form>
-
-      <a class="forgot-link" href="#">Forgot Password</a>
     </div>
   </div>
 

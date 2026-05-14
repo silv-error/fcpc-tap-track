@@ -90,6 +90,7 @@ $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
 $identifier = trim($body['email'] ?? '');   // accepts username or email
 $password   = $body['password']  ?? '';
+$rememberMe = (bool) ($body['rememberMe'] ?? false);
 
 if ($identifier === '' || $password === '') {
     json_response(['success' => false, 'message' => 'Email/username and password are required.'], 422);
@@ -210,6 +211,15 @@ $_SESSION['user_id']   = (int) $user['id'];
 $_SESSION['username']  = $user['username'];
 $_SESSION['role']      = $user['role'];
 $_SESSION['full_name'] = $user['first_name'] . ' ' . $user['last_name'];
+
+if ($rememberMe) {
+    setcookie('remember_token', bin2hex(random_bytes(32)), [
+        'expires'  => time() + (14 * 24 * 60 * 60),
+        'httponly' => true,
+        'secure'   => isset($_SERVER['HTTPS']),
+        'samesite' => 'Lax',
+    ]);
+}
 
 json_response([
     'success' => true,
