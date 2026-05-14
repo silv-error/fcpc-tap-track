@@ -347,6 +347,37 @@ function handle_add(mysqli $con): void
     $newId = mysqli_insert_id($con);
     mysqli_stmt_close($stmt);
 
+    // ── Handle RFID: delete any erroneous attendance log and log the registration scan ──
+    if ($rfidUid !== null) {
+        // Delete any attendance log that was mistakenly created for this RFID during registration
+        // (within the last 2 minutes) - this happens because hardware creates attendance before web form
+        $delStmt = mysqli_prepare($con, "
+            DELETE FROM attendance_logs
+            WHERE rfid_uid = ?
+            AND log_date = CURDATE()
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+        ");
+        
+        if ($delStmt) {
+            mysqli_stmt_bind_param($delStmt, 's', $rfidUid);
+            mysqli_stmt_execute($delStmt);
+            mysqli_stmt_close($delStmt);
+        }
+
+        // Log RFID scan as REGISTRATION
+        $logStmt = mysqli_prepare($con, "
+            INSERT INTO rfid_scan_logs (rfid_uid, scan_result, user_type, action, message, scanned_at)
+            VALUES (?, 'SUCCESS', 'Student', 'REGISTRATION', ?, NOW())
+        ");
+        
+        if ($logStmt) {
+            $logMessage = "Student registration: {$firstName} {$lastName} (Student #: {$studentNumber})";
+            mysqli_stmt_bind_param($logStmt, 'ss', $rfidUid, $logMessage);
+            mysqli_stmt_execute($logStmt);
+            mysqli_stmt_close($logStmt);
+        }
+    }
+
     json_response([
         'success' => true,
         'message' => 'Student added successfully.',
@@ -401,6 +432,38 @@ function handle_patch(mysqli $con): void
     }
 
     mysqli_stmt_close($stmt);
+
+    // ── Handle RFID: delete any erroneous attendance log and log the update scan ──
+    if ($rfidUid !== null) {
+        // Delete any attendance log that was mistakenly created for this RFID during update
+        // (within the last 2 minutes) - this happens because hardware creates attendance before web form
+        $delStmt = mysqli_prepare($con, "
+            DELETE FROM attendance_logs
+            WHERE rfid_uid = ?
+            AND log_date = CURDATE()
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+        ");
+        
+        if ($delStmt) {
+            mysqli_stmt_bind_param($delStmt, 's', $rfidUid);
+            mysqli_stmt_execute($delStmt);
+            mysqli_stmt_close($delStmt);
+        }
+
+        // Log RFID scan as RFID_UPDATE
+        $logStmt = mysqli_prepare($con, "
+            INSERT INTO rfid_scan_logs (rfid_uid, scan_result, user_type, action, message, scanned_at)
+            VALUES (?, 'SUCCESS', 'Student', 'RFID_UPDATE', ?, NOW())
+        ");
+        
+        if ($logStmt) {
+            $logMessage = "Student RFID update: Student ID #{$id}";
+            mysqli_stmt_bind_param($logStmt, 'ss', $rfidUid, $logMessage);
+            mysqli_stmt_execute($logStmt);
+            mysqli_stmt_close($logStmt);
+        }
+    }
+
     json_response(['success' => true, 'message' => 'Student RFID updated successfully.']);
 }
 
