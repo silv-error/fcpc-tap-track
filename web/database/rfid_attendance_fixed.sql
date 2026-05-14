@@ -140,8 +140,10 @@ CREATE TABLE `users` (
     `suffix` VARCHAR(10) DEFAULT NULL,
     `email` VARCHAR(150) NOT NULL,
     `password_hash` VARCHAR(255) NOT NULL,
-    `role` ENUM('Admin', 'Superadmin') NOT NULL DEFAULT 'Admin',
+    `role` ENUM('Admin','Superadmin') NOT NULL DEFAULT 'Admin',
     `is_active` TINYINT(1) NOT NULL DEFAULT 1,
+    `failed_login_attempts` INT(11) NOT NULL DEFAULT 0,
+    `locked_until` DATETIME DEFAULT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
