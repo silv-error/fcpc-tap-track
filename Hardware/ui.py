@@ -27,9 +27,10 @@ C_AMBER  = "#ffb347"
 C_RED    = "#ff5f5f"
 C_PURPLE = "#b48eff"
 
+# SYSTEM log entries: mid-brightness cyan-steel
 C_SLATE  = "#6eb5c0"
 
-# Text hierarchy
+# ── Text hierarchy ────────────────────────────────────────────────────────────
 C_TEXT_1 = "#e8edf8"
 C_TEXT_2 = "#a8bbd0"
 C_TEXT_3 = "#4e8fa0"
