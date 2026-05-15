@@ -2560,6 +2560,13 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
 (function () {
   console.log('Live RFID auto-fetch script loaded.');
 
+  // Only run RFID code on authenticated pages (not login page)
+  const currentPage = window.location.pathname.split('/').pop();
+  if (currentPage === 'login.php' || currentPage === '') {
+    console.log('RFID module skipped on login page');
+    return;
+  }
+
   let rfidPollingTimer    = null;
   let latestRfidBufferId  = 0;
   let currentRfidContext  = null;
