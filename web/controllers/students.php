@@ -39,9 +39,19 @@ function handle_get(mysqli $con): void
     }
 
     if ($action === 'rfid-buffer-max-id') {
-        $result = mysqli_query($con, "SELECT COALESCE(MAX(id), 0) AS max_id FROM rfid_uid_buffer");
-        $row    = mysqli_fetch_assoc($result);
-        json_response(['success' => true, 'max_id' => (int) $row['max_id']]);
+        $stmt = mysqli_prepare($con, "SELECT COALESCE(MAX(id), 0) AS max_id FROM rfid_uid_buffer");
+
+        if (!$stmt || !mysqli_stmt_execute($stmt)) {
+            error_log('RFID buffer max-id query failed: ' . mysqli_error($con));
+            json_response(['success' => false, 'message' => 'A database error occurred.'], 500);
+        }
+
+        $result = mysqli_stmt_get_result($stmt);
+        $row    = $result ? mysqli_fetch_assoc($result) : null;
+        mysqli_stmt_close($stmt);
+        $maxId = (int) ($row['max_id'] ?? 0);
+
+        json_response(['success' => true, 'max_id' => $maxId]);
         return;
     }
 
@@ -103,9 +113,16 @@ function handle_get(mysqli $con): void
 
 function handle_get_latest_rfid_uid(mysqli $con): void
 {
-    $tableCheck = mysqli_query($con, "SHOW TABLES LIKE 'rfid_uid_buffer'");
+    $tableCheckStmt = mysqli_prepare($con, "SHOW TABLES LIKE 'rfid_uid_buffer'");
+    $tableExists = false;
 
-    if (!$tableCheck || mysqli_num_rows($tableCheck) === 0) {
+    if ($tableCheckStmt && mysqli_stmt_execute($tableCheckStmt)) {
+        $tableCheckResult = mysqli_stmt_get_result($tableCheckStmt);
+        $tableExists = $tableCheckResult && mysqli_num_rows($tableCheckResult) > 0;
+        mysqli_stmt_close($tableCheckStmt);
+    }
+
+    if (!$tableExists) {
         json_response(['success' => false, 'message' => 'RFID buffer table does not exist.'], 500);
     }
 
@@ -330,6 +347,48 @@ function handle_add(mysqli $con): void
     $newId = mysqli_insert_id($con);
     mysqli_stmt_close($stmt);
 
+    // ── Handle RFID: delete any erroneous attendance log and log the registration scan ──
+    if ($rfidUid !== null) {
+        // Delete unregistered attendance logs that were created for this RFID during registration
+        // (within the last 2 minutes) - this happens because hardware creates attendance before web form
+        // Only delete logs with NULL student_id AND NULL employee_id to avoid race conditions
+        $delStmt = mysqli_prepare($con, "
+            DELETE FROM attendance_logs
+            WHERE rfid_uid = ?
+            AND student_id IS NULL
+            AND employee_id IS NULL
+            AND log_date = CURDATE()
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+        ");
+        
+        if ($delStmt) {
+            mysqli_stmt_bind_param($delStmt, 's', $rfidUid);
+            if (!mysqli_stmt_execute($delStmt)) {
+                error_log('DELETE cleanup failed in handle_add (students): ' . mysqli_stmt_error($delStmt));
+            }
+            mysqli_stmt_close($delStmt);
+        } else {
+            error_log('Prepare DELETE cleanup failed in handle_add (students): ' . mysqli_error($con));
+        }
+
+        // Log RFID scan as REGISTRATION
+        $logStmt = mysqli_prepare($con, "
+            INSERT INTO rfid_scan_logs (rfid_uid, scan_result, user_type, action, message, scanned_at)
+            VALUES (?, 'SUCCESS', 'Student', 'REGISTRATION', ?, NOW())
+        ");
+        
+        if ($logStmt) {
+            $logMessage = "Student registration: {$firstName} {$lastName} (Student #: {$studentNumber})";
+            mysqli_stmt_bind_param($logStmt, 'ss', $rfidUid, $logMessage);
+            if (!mysqli_stmt_execute($logStmt)) {
+                error_log('INSERT rfid_scan_logs failed in handle_add (students): ' . mysqli_stmt_error($logStmt));
+            }
+            mysqli_stmt_close($logStmt);
+        } else {
+            error_log('Prepare INSERT rfid_scan_logs failed in handle_add (students): ' . mysqli_error($con));
+        }
+    }
+
     json_response([
         'success' => true,
         'message' => 'Student added successfully.',
@@ -384,6 +443,49 @@ function handle_patch(mysqli $con): void
     }
 
     mysqli_stmt_close($stmt);
+
+    // ── Handle RFID: delete any erroneous attendance log and log the update scan ──
+    if ($rfidUid !== null) {
+        // Delete unregistered attendance logs that were created for this RFID during update
+        // (within the last 2 minutes) - this happens because hardware creates attendance before web form
+        // Only delete logs with NULL student_id AND NULL employee_id to avoid race conditions
+        $delStmt = mysqli_prepare($con, "
+            DELETE FROM attendance_logs
+            WHERE rfid_uid = ?
+            AND student_id IS NULL
+            AND employee_id IS NULL
+            AND log_date = CURDATE()
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+        ");
+        
+        if ($delStmt) {
+            mysqli_stmt_bind_param($delStmt, 's', $rfidUid);
+            if (!mysqli_stmt_execute($delStmt)) {
+                error_log('DELETE cleanup failed in handle_patch (students): ' . mysqli_stmt_error($delStmt));
+            }
+            mysqli_stmt_close($delStmt);
+        } else {
+            error_log('Prepare DELETE cleanup failed in handle_patch (students): ' . mysqli_error($con));
+        }
+
+        // Log RFID scan as RFID_UPDATE
+        $logStmt = mysqli_prepare($con, "
+            INSERT INTO rfid_scan_logs (rfid_uid, scan_result, user_type, action, message, scanned_at)
+            VALUES (?, 'SUCCESS', 'Student', 'RFID_UPDATE', ?, NOW())
+        ");
+        
+        if ($logStmt) {
+            $logMessage = "Student RFID update: Student ID #{$id}";
+            mysqli_stmt_bind_param($logStmt, 'ss', $rfidUid, $logMessage);
+            if (!mysqli_stmt_execute($logStmt)) {
+                error_log('INSERT rfid_scan_logs failed in handle_patch (students): ' . mysqli_stmt_error($logStmt));
+            }
+            mysqli_stmt_close($logStmt);
+        } else {
+            error_log('Prepare INSERT rfid_scan_logs failed in handle_patch (students): ' . mysqli_error($con));
+        }
+    }
+
     json_response(['success' => true, 'message' => 'Student RFID updated successfully.']);
 }
 

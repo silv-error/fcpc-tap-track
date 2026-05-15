@@ -283,6 +283,48 @@ function handle_add(mysqli $con): void
     $newId = mysqli_insert_id($con);
     mysqli_stmt_close($stmt);
 
+    // ── Handle RFID: delete any erroneous attendance log and log the registration scan ──
+    if ($rfidUid !== null) {
+        // Delete unregistered attendance logs that were created for this RFID during registration
+        // (within the last 2 minutes) - this happens because hardware creates attendance before web form
+        // Only delete logs with NULL student_id AND NULL employee_id to avoid race conditions
+        $delStmt = mysqli_prepare($con, "
+            DELETE FROM attendance_logs
+            WHERE rfid_uid = ?
+            AND student_id IS NULL
+            AND employee_id IS NULL
+            AND log_date = CURDATE()
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+        ");
+        
+        if ($delStmt) {
+            mysqli_stmt_bind_param($delStmt, 's', $rfidUid);
+            if (!mysqli_stmt_execute($delStmt)) {
+                error_log('DELETE cleanup failed in handle_add (employees): ' . mysqli_stmt_error($delStmt));
+            }
+            mysqli_stmt_close($delStmt);
+        } else {
+            error_log('Prepare DELETE cleanup failed in handle_add (employees): ' . mysqli_error($con));
+        }
+
+        // Log RFID scan as REGISTRATION
+        $logStmt = mysqli_prepare($con, "
+            INSERT INTO rfid_scan_logs (rfid_uid, scan_result, user_type, action, message, scanned_at)
+            VALUES (?, 'SUCCESS', 'Employee', 'REGISTRATION', ?, NOW())
+        ");
+        
+        if ($logStmt) {
+            $logMessage = "Employee registration: {$firstName} {$lastName} (Employee #: {$employeeNumber})";
+            mysqli_stmt_bind_param($logStmt, 'ss', $rfidUid, $logMessage);
+            if (!mysqli_stmt_execute($logStmt)) {
+                error_log('INSERT rfid_scan_logs failed in handle_add (employees): ' . mysqli_stmt_error($logStmt));
+            }
+            mysqli_stmt_close($logStmt);
+        } else {
+            error_log('Prepare INSERT rfid_scan_logs failed in handle_add (employees): ' . mysqli_error($con));
+        }
+    }
+
     json_response([
         'success' => true,
         'message' => 'Employee added successfully.',
@@ -344,6 +386,48 @@ function handle_patch(mysqli $con): void
     }
 
     mysqli_stmt_close($stmt);
+
+    // ── Handle RFID: delete any erroneous attendance log and log the update scan ──
+    if ($rfidUid !== null) {
+        // Delete unregistered attendance logs that were created for this RFID during update
+        // (within the last 2 minutes) - this happens because hardware creates attendance before web form
+        // Only delete logs with NULL student_id AND NULL employee_id to avoid race conditions
+        $delStmt = mysqli_prepare($con, "
+            DELETE FROM attendance_logs
+            WHERE rfid_uid = ?
+            AND student_id IS NULL
+            AND employee_id IS NULL
+            AND log_date = CURDATE()
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 2 MINUTE)
+        ");
+        
+        if ($delStmt) {
+            mysqli_stmt_bind_param($delStmt, 's', $rfidUid);
+            if (!mysqli_stmt_execute($delStmt)) {
+                error_log('DELETE cleanup failed in handle_patch (employees): ' . mysqli_stmt_error($delStmt));
+            }
+            mysqli_stmt_close($delStmt);
+        } else {
+            error_log('Prepare DELETE cleanup failed in handle_patch (employees): ' . mysqli_error($con));
+        }
+
+        // Log RFID scan as RFID_UPDATE
+        $logStmt = mysqli_prepare($con, "
+            INSERT INTO rfid_scan_logs (rfid_uid, scan_result, user_type, action, message, scanned_at)
+            VALUES (?, 'SUCCESS', 'Employee', 'RFID_UPDATE', ?, NOW())
+        ");
+        
+        if ($logStmt) {
+            $logMessage = "Employee RFID update: Employee ID #{$id}";
+            mysqli_stmt_bind_param($logStmt, 'ss', $rfidUid, $logMessage);
+            if (!mysqli_stmt_execute($logStmt)) {
+                error_log('INSERT rfid_scan_logs failed in handle_patch (employees): ' . mysqli_stmt_error($logStmt));
+            }
+            mysqli_stmt_close($logStmt);
+        } else {
+            error_log('Prepare INSERT rfid_scan_logs failed in handle_patch (employees): ' . mysqli_error($con));
+        }
+    }
 
     json_response(['success' => true, 'message' => 'Employee RFID updated successfully.']);
 }

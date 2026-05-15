@@ -154,12 +154,21 @@ require_once __DIR__ . '/../controllers/csrf.php';
 
       <div class="table-wrapper">
         <table class="data-table" data-endpoint="../controllers/employees.php" data-table-type="employees">
+            <colgroup>
+                <col style="width: 12%"> <!-- Employee No. -->
+                <col style="width: 12%"> <!-- RFID UID -->
+                <col style="width: 10%"> <!-- Status -->
+                <col style="width: 26%"> <!-- Name -->
+                <col style="width: 20%"> <!-- Position -->
+                <col style="width: 14%"> <!-- Department -->
+                <col style="width: 6%">  <!-- Actions -->
+            </colgroup>
           <thead>
             <tr>
               <th>Employee No.</th>
               <th>RFID UID</th>
               <th>Status</th>
-              <th>Name</th>
+              <th>Employee Name</th>
               <th>Position</th>
               <th>Department</th>
               <th>Actions</th>

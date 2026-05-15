@@ -513,8 +513,11 @@ function renderCurrentPage() {
       actionWrap.className = 'row-actions';
 
       const viewBtn = document.createElement('button');
-      viewBtn.className   = 'row-action-btn view';
-      viewBtn.textContent = 'View';
+      viewBtn.className = 'row-action-btn view';
+      viewBtn.setAttribute('aria-label', 'View');
+      viewBtn.title = 'View';
+      viewBtn.dataset.label = 'View';
+      viewBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="12" cy="12" r="3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></circle></svg>';
       viewBtn.onclick = (e) => {
         e.preventDefault();
         if (tableState.pageType === 'students')       openViewStudentModal(record);
@@ -523,8 +526,11 @@ function renderCurrentPage() {
       };
 
       const editBtn = document.createElement('button');
-      editBtn.className   = 'row-action-btn edit';
-      editBtn.textContent = 'Edit';
+      editBtn.className = 'row-action-btn edit';
+      editBtn.setAttribute('aria-label', 'Edit');
+      editBtn.title = 'Edit';
+      editBtn.dataset.label = 'Edit';
+      editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M3 21v-3.75L14.06 6.19a2.21 2.21 0 0 1 3.13 0l0 0a2.21 2.21 0 0 1 0 3.13L6.19 21H3z" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path><path d="M14 7l3 3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
       editBtn.onclick = (e) => {
         e.preventDefault();
         if (tableState.pageType === 'students')       openEditStudentModal(record);
@@ -949,10 +955,11 @@ function togglePassword() {
 async function handleLogin(e) {
   if (e) e.preventDefault();
 
-  const email    = document.getElementById('email')?.value.trim();
-  const password = document.getElementById('password')?.value;
-  const btn      = document.querySelector('#loginForm .btn-login');
-  const message  = document.getElementById('loginMessage');
+  const email     = document.getElementById('email')?.value.trim();
+  const password  = document.getElementById('password')?.value;
+  const rememberMe = document.getElementById('rememberMe')?.checked ?? false;
+  const btn       = document.querySelector('#loginForm .btn-login');
+  const message   = document.getElementById('loginMessage');
 
   const showLoginMessage = (text, type = 'error') => {
     if (!message) return;
@@ -977,7 +984,7 @@ async function handleLogin(e) {
     const res  = await fetch('../controllers/login.php', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
-      body:    JSON.stringify({ email, password }),
+      body:    JSON.stringify({ email, password, rememberMe }),
     });
 
     const contentType = res.headers.get('content-type') || '';
@@ -1002,10 +1009,24 @@ async function handleLogin(e) {
 function toggleSidebar() {
   const sidebar = document.querySelector('.sidebar');
   if (!sidebar) return;
+  // On small screens, open sidebar as off-canvas drawer instead of collapsing
+  if (window.innerWidth <= 700) {
+    const isOpen = document.documentElement.classList.toggle('sidebar-open');
+    // show overlay to allow tapping outside to close
+    const overlay = document.getElementById('pageTransitionOverlay');
+    if (overlay) {
+      overlay.classList.toggle('active', isOpen);
+      overlay.onclick = () => { document.documentElement.classList.remove('sidebar-open'); overlay.classList.remove('active'); };
+    }
+    return;
+  }
+
   const isCollapsed = sidebar.classList.toggle('collapsed');
   document.documentElement.classList.toggle('sidebar-collapsed', isCollapsed);
   localStorage.setItem('sidebar-collapsed', isCollapsed ? '1' : '0');
 }
+
+window.toggleSidebar = toggleSidebar;
 
 function initLoadingSkeletons() {
   const wrappers = document.querySelectorAll('.table-wrapper');
@@ -2169,7 +2190,15 @@ async function saveEditStudent() {
   const record = modal?._record;
   if (!record?.id) { showToast('Student record not found.', 'error'); return; }
 
-  const rfid = document.getElementById('editStudentRfid')?.value.trim() || '';
+  const rfid         = document.getElementById('editStudentRfid')?.value.trim() || '';
+  const originalRfid = (record.rfid_uid && record.rfid_uid !== '-') ? record.rfid_uid.trim() : '';
+
+  if (rfid === originalRfid) {
+    showToast('No changes detected.', 'info');
+    closeEditStudentModal();
+    return;
+  }
+
   try {
     const endpoint = getEndpoint(tableState.table) || '../../controllers/students.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
@@ -2362,7 +2391,15 @@ async function saveEditEmployee() {
   const record = modal?._record;
   if (!record?.id) { showToast('Employee record not found.', 'error'); return; }
 
-  const rfid = document.getElementById('editEmployeeRfid')?.value.trim() || '';
+  const rfid         = document.getElementById('editEmployeeRfid')?.value.trim() || '';
+  const originalRfid = (record.rfid_uid && record.rfid_uid !== '-') ? record.rfid_uid.trim() : '';
+
+  if (rfid === originalRfid) {
+    showToast('No changes detected.', 'info');
+    closeEditEmployeeModal();
+    return;
+  }
+
   try {
     const endpoint = getEndpoint(tableState.table) || '../../controllers/employees.php';
     await apiRequest(endpoint, 'PATCH', { id: record.id, rfid_uid: rfid });
@@ -2522,6 +2559,13 @@ window.addEventListener('beforeunload', stopRealtimeTableRefresh);
 
 (function () {
   console.log('Live RFID auto-fetch script loaded.');
+
+  // Only run RFID code on authenticated pages (not login page)
+  const currentPage = window.location.pathname.split('/').pop();
+  if (currentPage === 'login.php' || currentPage === '') {
+    console.log('RFID module skipped on login page');
+    return;
+  }
 
   let rfidPollingTimer    = null;
   let latestRfidBufferId  = 0;

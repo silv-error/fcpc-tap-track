@@ -168,9 +168,9 @@ try {
         
         // Build headers based on category
         if ($includeStrand) {
-            $headers = ['Student No.', 'RFID UID', 'Status', 'Name', 'Program', 'Year Level', 'Department', 'Strand'];
+            $headers = ['Student No.', 'RFID UID', 'Status', 'Student Name', 'Program', 'Year Level', 'Department', 'Strand'];
         } else {
-            $headers = ['Student No.', 'RFID UID', 'Status', 'Name', 'Program', 'Year Level', 'Department'];
+            $headers = ['Student No.', 'RFID UID', 'Status', 'Student Name', 'Program', 'Year Level', 'Department'];
         }
 
         if (!empty($filters['search'])) {
@@ -238,7 +238,7 @@ try {
             ORDER BY last_name ASC, first_name ASC
         ";
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Employee No.', 'RFID UID', 'Status', 'Name', 'Position', 'Department'];
+        $headers = ['Employee No.', 'RFID UID', 'Status', 'Employee Name', 'Position', 'Department'];
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -303,7 +303,7 @@ try {
         ";
 
         $data    = fetch_all_rows($con, $sql);
-        $headers = ['Date', 'RFID UID', 'Status', 'Name', 'Time In', 'Time Out'];
+        $headers = ['Date', 'RFID UID', 'Name', 'Status', 'Time In', 'Time Out'];
 
         if (!empty($filters['search'])) {
             $searchTerms = build_search_terms((string) $filters['search']);
@@ -513,6 +513,7 @@ try {
 
         if ($exportType === 'students') {
             $name    = trim($record['last_name'] . ', ' . $record['first_name'] . ' ' . ($record['middle_name'] ?? ''));
+            $status  = $record['status'] ?: 'Unregistered';
             $exportCategory = $filters['category'] ?? 'all';
             $includeStrand = $exportCategory === 'all' || $exportCategory === 'Basic Education';
             
@@ -520,6 +521,7 @@ try {
                 $rowData = [
                     $record['student_number'],
                     $record['rfid_uid'] ?: '-',
+                    $status,
                     $name,
                     $record['program'] ?: '-',
                     $record['year_level'] ?: '-',
@@ -530,6 +532,7 @@ try {
                 $rowData = [
                     $record['student_number'],
                     $record['rfid_uid'] ?: '-',
+                    $status,
                     $name,
                     $record['program'] ?: '-',
                     $record['year_level'] ?: '-',
@@ -541,6 +544,7 @@ try {
             $rowData = [
                 $record['employee_number'],
                 $record['rfid_uid'] ?: '-',
+                $record['status'] ?: 'Unregistered',
                 $name,
                 $record['position'],
                 $record['department'],
@@ -560,8 +564,8 @@ try {
             $rowData = [
                 $record['log_date'],
                 $refNum,
-                ucfirst(strtolower((string) ($record['registration_status'] ?? 'Unregistered'))),
                 $name,
+                ucfirst(strtolower((string) ($record['registration_status'] ?? 'Unregistered'))),
                 $timeIn,
                 $timeOut,
             ];
@@ -589,9 +593,9 @@ try {
 
     // ── Column widths ─────────────────────────────────────────────────────────
     $columnWidths = match ($exportType) {
-        'students'   => [18, 18, 30, 18, 14, 30],
-        'employees'  => [18, 18, 30, 18, 30],
-        'attendance' => [14, 14, 25, 12, 12],
+        'students'   => [18, 18, 16, 30, 68, 14, 30, 50],
+        'employees'  => [18, 18, 18, 30, 18, 30],
+        'attendance' => [14, 14, 25, 18, 12, 12],
         default      => [12],
     };
 
