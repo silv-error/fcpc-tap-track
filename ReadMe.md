@@ -156,7 +156,7 @@ $db   = "rfid_attendance";
 A utility script is included to bootstrap the first user:
 
 ```
-http://localhost/rfid-attendance/create-test-user.php
+http://localhost/fcpc-tap-track/create-test-user.php
 ```
 
 > **Important:** Delete or restrict access to `create-test-user.php` after creating your initial account.
