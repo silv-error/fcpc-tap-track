@@ -127,7 +127,7 @@ Alternatively, edit `db_config.json` manually:
 
 Copy the `web/` folder into your web server's root directory:
 
-- **XAMPP:** `C:/xampp/htdocs/rfid-attendance/`
+- **XAMPP:** `C:/xampp/htdocs/fcpc-tap-track/`
 
 ### 2. Install PHP Dependencies
 
