@@ -336,10 +336,10 @@ class _DbConfigDialog(tk.Toplevel):
         self._status_lbl.configure(fg=color)
 
     def _on_cancel(self):
-        # Closing the dialog without connecting exits the whole application.
+        # Dismiss the dialog only — the main window stays open.
+        # The user can re-open the dialog any time via ⚙ DB CONFIG.
         self.grab_release()
         self.destroy()
-        self.master.destroy()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1210,11 +1210,9 @@ class AttendanceUI:
         self._auto_start       = auto_start
         self._apply_backend_buttons(False)
 
-        # ── first launch vs. returning user ───────────────────────────────
-        # If db_config.json already exists we silently reconnect in the
-        # background and go straight to the log view.  The dialog only
-        # appears automatically on the very first run (no saved config).
-        # The user can always open it manually via ⚙ DB CONFIG.
+        # Always attempt to connect on startup.
+        # • Config exists  → silent connect; show dialog only if it fails.
+        # • No config yet  → show dialog immediately so the user can set up.
         if config.is_configured():
             self.root.after(100, self._silent_connect)
         else:
@@ -1234,6 +1232,10 @@ class AttendanceUI:
 
     def _show_db_dialog(self):
         """Open the config dialog (first run or manually triggered)."""
+        self.post_log(
+            "INFO", "DB_CFG",
+            "Database not connected. Use ⚙ DB CONFIG in the toolbar to connect.",
+        )
         _DbConfigDialog(parent=self.root, on_connect=self._on_dialog_connect)
 
     def _silent_connect(self):
@@ -1273,11 +1275,15 @@ class AttendanceUI:
     def _on_silent_failure(self, cfg: dict, error_msg: str):
         """Saved config failed — log a warning and open the dialog so the
         user can correct the settings (e.g. host changed, new password)."""
+        self._update_db_indicator(connected=False)
         self.post_log(
             "WARN", "DB_CFG",
-            f"Auto-connect failed ({cfg['host']}:{cfg['port']}): {error_msg}",
+            f"Could not connect to saved database ({cfg['host']}:{cfg['port']}): {error_msg}",
         )
-        self.post_log("WARN", "DB_CFG", "Opening configuration dialog…")
+        self.post_log(
+            "INFO", "DB_CFG",
+            "Please update your connection settings in the dialog that just opened.",
+        )
         self._show_db_dialog()
 
     def _on_dialog_connect(self, db_cfg: dict):
