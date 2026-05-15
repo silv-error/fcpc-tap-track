@@ -1,4 +1,4 @@
-# RFID Attendance System
+# FCPC TAP TRACK
 
 A two-component attendance tracking system that uses RFID cards to log time-in and time-out events for students and employees. The **Hardware Client** runs on a dedicated machine connected to an RFID reader and writes attendance records directly to a shared MySQL database. The **Web Dashboard** provides administrators with a browser-based interface for managing records, monitoring attendance, and exporting reports.
 
