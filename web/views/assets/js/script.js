@@ -993,8 +993,10 @@ async function handleLogin(e) {
       : { success: false, message: await res.text() };
 
     if (json.success) {
+      const role = String(json?.data?.role || '').toLowerCase();
+      const landingPage = role === 'superadmin' ? 'users.php' : 'students.php';
       showLoginMessage(json.message || 'Login successful.', 'success');
-      navigateWithTransition('users.php');
+      navigateWithTransition(landingPage);
     } else {
       showLoginMessage(json.message || 'Invalid credentials.');
     }

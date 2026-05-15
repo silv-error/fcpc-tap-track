@@ -8,6 +8,11 @@ require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/auth_check.php';
 require_once __DIR__ . '/csrf.php';
 
+$currentRole = strtolower(trim((string) ($_SESSION['role'] ?? '')));
+if ($currentRole !== 'superadmin') {
+    json_response(['success' => false, 'message' => 'Forbidden. Superadmin access required.'], 403);
+}
+
 if (in_array($_SERVER['REQUEST_METHOD'], ['POST', 'PATCH', 'PUT', 'DELETE'])) {
     validate_csrf_token();
 }
