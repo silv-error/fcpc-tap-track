@@ -5,7 +5,10 @@ session_start();
 
 // If already logged in, redirect to users page
 if (!empty($_SESSION['user_id'])) {
-  header('Location: users.php');
+  $dashboardTarget = strtolower(trim((string) ($_SESSION['role'] ?? ''))) === 'superadmin'
+    ? 'users.php'
+    : 'students.php';
+  header('Location: ' . $dashboardTarget);
   exit;
 }
 

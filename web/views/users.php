@@ -6,7 +6,13 @@ session_start();
 if (empty($_SESSION['user_id'])) {
   header('Location: login.php');
     exit;
-} 
+}
+
+$currentRole = strtolower(trim((string) ($_SESSION['role'] ?? '')));
+if ($currentRole !== 'superadmin') {
+  header('Location: students.php');
+  exit;
+}
 
 require_once __DIR__ . '/../controllers/csrf.php';
 ?>

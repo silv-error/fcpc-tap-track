@@ -8,6 +8,9 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 
+$currentRole = strtolower(trim((string) ($_SESSION['role'] ?? '')));
+$canManageUsers = $currentRole === 'superadmin';
+
 require_once __DIR__ . '/../controllers/csrf.php';
 ?>
 
@@ -49,12 +52,14 @@ require_once __DIR__ . '/../controllers/csrf.php';
     </div>
 
     <nav class="sidebar-nav">
+      <?php if ($canManageUsers): ?>
       <a href="users.php">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
         </svg>
         Users
       </a>
+      <?php endif; ?>
       <a href="students.php" class="active">
         <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
           <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6L21 9l-9-6zm0 4.2L17.53 10 12 12.8 6.47 10 12 7.2zM7 12.7l5 2.73 5-2.73v3.16L12 18.6l-5-2.74v-3.16z"/>

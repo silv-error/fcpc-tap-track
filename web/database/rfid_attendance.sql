@@ -155,7 +155,7 @@ CREATE TABLE `users` (
 DEFAULT CHARSET=utf8mb4
 COLLATE=utf8mb4_general_ci;
 
--- Test User
+-- Test Users
 INSERT INTO users (
   employee_id,
   username,
@@ -174,6 +174,30 @@ INSERT INTO users (
   'SPadmin',
   'spadmin@fcpc.edu.ph',
   'Superadmin',
+  '$2y$10$H2UDJhbVf/oVR/xBH2iUkeUsLeF4xBNbfXC9v8P3yGPYqkp6rlWca',
+  1,
+  NOW(),
+  NOW()
+);
+
+INSERT INTO users (
+  employee_id,
+  username,
+  first_name,
+  last_name,
+  email,
+  role,
+  password_hash,
+  is_active,
+  created_at,
+  updated_at
+) VALUES (
+  NULL,
+  'admin',
+  'Test',
+  'Admin',
+  'admin@fcpc.edu.ph',
+  'Admin',
   '$2y$10$H2UDJhbVf/oVR/xBH2iUkeUsLeF4xBNbfXC9v8P3yGPYqkp6rlWca',
   1,
   NOW(),
